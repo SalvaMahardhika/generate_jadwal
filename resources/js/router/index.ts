@@ -18,6 +18,12 @@ const routes: Array<RouteRecordRaw> = [
     component: () => import('../pages/admin/Dashboard.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/admin/teachers',
+    name: 'admin.teachers',
+    component: () => import('../pages/admin/Teachers.vue'),
+    meta: { requiresAuth: true },
+  },
 ];
 
 const router = createRouter({
