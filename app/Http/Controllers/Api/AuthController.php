@@ -28,12 +28,15 @@ class AuthController extends Controller
                     'token' => $result['token'],
                     'token_type' => 'Bearer',
                 ],
-            ]);
+            ], 200);
         } catch (Exception $e) {
+            $rawCode = is_numeric($e->getCode()) ? (int) $e->getCode() : 500;
+            $statusCode = ($rawCode >= 100 && $rawCode <= 599) ? $rawCode : 401;
+
             return response()->json([
                 'status' => 'error',
                 'message' => $e->getMessage(),
-            ], $e->getCode() ?: 500);
+            ], $statusCode);
         }
     }
 
@@ -42,7 +45,7 @@ class AuthController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => $request->user(),
-        ]);
+        ], 200);
     }
 
     public function logout(Request $request): JsonResponse
@@ -53,7 +56,7 @@ class AuthController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'Berhasil keluar.',
-            ]);
+            ], 200);
         } catch (Exception $e) {
             return response()->json([
                 'status' => 'error',
