@@ -1,0 +1,27 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('time_slots', function (Blueprint $table) {
+            $table->id();
+            $table->enum('day', ['senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu']);
+            $table->integer('period_number'); // Jam ke-1, jam ke-2, dst.
+            $table->string('label', 50)->nullable(); // Misal "07.30 - 08.30"
+            $table->time('start_time');
+            $table->time('end_time');
+            $table->boolean('is_break')->default(false); // Flag jam istirahat / ISHOMA
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('time_slots');
+    }
+};
