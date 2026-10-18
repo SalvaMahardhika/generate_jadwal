@@ -10,10 +10,10 @@ return new class extends Migration
     {
         Schema::create('subjects', function (Blueprint $table) {
             $table->id();
-            $table->string('subject_code', 20)->unique(); // Kode singkat: "MTK", "PABP"
-            $table->string('subject_name'); // Nama lengkap: "Matematika"
-            $table->string('color_code', 10)->default('#3B82F6'); // Warna untuk UI
-            $table->enum('category', ['wajib', 'mulok', 'kokurikuler'])->default('wajib');
+            $table->string('subject_code', 20)->unique();
+            $table->string('subject_name');
+            $table->string('color_code', 10)->default('#3B82F6');
+            $table->enum('category', ['wajib', 'peminatan', 'mulok', 'kejuruan', 'kokurikuler'])->default('wajib');
             $table->integer('passing_grade')->default(75);
             $table->enum('status', ['active', 'inactive'])->default('active');
             $table->timestamps();
