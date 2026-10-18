@@ -30,6 +30,12 @@ const routes: Array<RouteRecordRaw> = [
     component: () => import('../pages/admin/Subjects.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/admin/time-slots',
+    name: 'admin.time-slots',
+    component: () => import('../pages/admin/TimeSlots.vue'),
+    meta: { requiresAuth: true },
+  },
 ];
 
 const router = createRouter({

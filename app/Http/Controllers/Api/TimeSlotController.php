@@ -19,7 +19,8 @@ class TimeSlotController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $isBreak = $request->has('is_break') ? $request->boolean('is_break') : null;
+        // Menggunakan filled() agar query parameter yang bernilai empty string ("") diabaikan/bernilai null
+        $isBreak = $request->filled('is_break') ? $request->boolean('is_break') : null;
 
         $timeSlots = $this->timeSlotService->getAll(
             $request->query('day'),
