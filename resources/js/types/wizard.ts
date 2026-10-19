@@ -78,6 +78,7 @@ export interface MasterMatrixData {
 export interface GenerateSchedulePayload {
   academic_year_id: number;
   class_id?: number | null;
+  max_period_number?: number | null;
 }
 
 export interface LockSlotPayload {

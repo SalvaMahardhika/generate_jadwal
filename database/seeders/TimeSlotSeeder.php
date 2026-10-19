@@ -11,7 +11,7 @@ class TimeSlotSeeder extends Seeder
     {
         $days = ['senin', 'selasa', 'rabu', 'kamis', 'jumat'];
 
-        // Struktur jam Senin - Kamis
+        // Jam belajar SD Senin - Kamis (07.30 - 15.00)
         $mondayToThursdaySlots = [
             ['period' => 1, 'start' => '07.30', 'end' => '08.30', 'is_break' => false, 'label' => 'JP 1'],
             ['period' => 2, 'start' => '08.30', 'end' => '09.05', 'is_break' => false, 'label' => 'JP 2'],
@@ -26,7 +26,7 @@ class TimeSlotSeeder extends Seeder
             ['period' => 11, 'start' => '14.25', 'end' => '15.00', 'is_break' => false, 'label' => 'JP 9'],
         ];
 
-        // Struktur jam khusus hari Jumat (lebih pendek)
+        // Jam belajar SD Jumat (07.30 - 13.50)
         $fridaySlots = [
             ['period' => 1, 'start' => '07.30', 'end' => '08.30', 'is_break' => false, 'label' => 'JP 1'],
             ['period' => 2, 'start' => '08.30', 'end' => '09.05', 'is_break' => false, 'label' => 'JP 2'],

@@ -33,6 +33,7 @@
         v-model:selectedAcademicYearId="wizardStore.selectedAcademicYearId"
         v-model:selectedClassId="wizardStore.selectedClassId"
         v-model:selectedTeacherId="wizardStore.selectedTeacherId"
+        v-model:maxPeriodNumber="wizardStore.maxPeriodNumber"
         :academicYears="academicYearsList"
         :classes="classesList"
         :teachers="teachersList"
@@ -123,6 +124,14 @@ const activeSchedule = ref<ScheduleItem | null>(null);
 
 const availableClassSubjects = computed(() => classSubjectsMap.value);
 
+const updateDefaultMaxPeriod = (selectedClass?: ClassItem) => {
+  if (!selectedClass) return;
+  const gradeSeq = selectedClass.grade?.sequence || 1;
+  if (gradeSeq <= 2) wizardStore.maxPeriodNumber = 6;
+  else if (gradeSeq <= 4) wizardStore.maxPeriodNumber = 8;
+  else wizardStore.maxPeriodNumber = 11;
+};
+
 const fetchDropdowns = async () => {
   try {
     const [ayRes, clsRes, tchrRes] = await Promise.all([
@@ -140,7 +149,10 @@ const fetchDropdowns = async () => {
 
     if (clsRes.data?.status === 'success') {
       classesList.value = clsRes.data.data;
-      if (classesList.value.length > 0) wizardStore.selectedClassId = classesList.value[0].id;
+      if (classesList.value.length > 0) {
+        wizardStore.selectedClassId = classesList.value[0].id;
+        updateDefaultMaxPeriod(classesList.value[0]);
+      }
     }
 
     if (tchrRes.data?.status === 'success') {
@@ -182,6 +194,8 @@ watch(() => wizardStore.viewMode, () => wizardStore.refreshCurrentView());
 watch(() => wizardStore.selectedAcademicYearId, () => wizardStore.refreshCurrentView());
 watch(() => wizardStore.selectedClassId, (newId) => {
   if (newId) {
+    const cls = classesList.value.find(c => c.id === newId);
+    updateDefaultMaxPeriod(cls);
     fetchClassSubjects(newId);
     if (wizardStore.viewMode === 'class') wizardStore.fetchClassMatrix(newId);
   }

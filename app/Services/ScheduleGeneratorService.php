@@ -136,10 +136,13 @@ class ScheduleGeneratorService
     /**
      * Eksekusi Algoritma Auto-Generate Jadwal.
      */
-    public function generate(int $academicYearId, ?int $classId = null, int $userId = 1): array
+    public function generate(int $academicYearId, ?int $classId = null, int $userId = 1, ?int $maxPeriodNumber = null): array
     {
-        return DB::transaction(function () use ($academicYearId, $classId, $userId) {
-            $classesQuery = Classes::where('academic_year_id', $academicYearId)->where('status', 'active');
+        return DB::transaction(function () use ($academicYearId, $classId, $userId, $maxPeriodNumber) {
+            $classesQuery = Classes::with('grade')
+                ->where('academic_year_id', $academicYearId)
+                ->where('status', 'active');
+
             if ($classId) {
                 $classesQuery->where('id', $classId);
             }
@@ -149,9 +152,10 @@ class ScheduleGeneratorService
                 throw new Exception('Tidak ada kelas aktif yang ditemukan untuk di-generate.', 404);
             }
 
-            $timeSlots = TimeSlot::where('is_break', false)
-                ->orderByRaw("FIELD(day, 'senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu')")
+            // Urutkan period_number ASC terlebih dahulu agar JP terbagi merata dari Senin sampai Jumat
+            $allTimeSlots = TimeSlot::where('is_break', false)
                 ->orderBy('period_number', 'asc')
+                ->orderByRaw("FIELD(day, 'senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu')")
                 ->get();
 
             // Hapus draft jadwal lama yang TIDAK dikunci
@@ -163,6 +167,18 @@ class ScheduleGeneratorService
             $unplacedPool = [];
 
             foreach ($classes as $class) {
+                $sequence = $class->grade?->sequence ?? 1;
+
+                // Tentukan batas jam: gunakan input kustom dari Wizard jika dikirim, atau fallback ke default jenjang
+                $limitPeriod = $maxPeriodNumber ?: match ($sequence) {
+                    1, 2    => 6,
+                    3, 4    => 8,
+                    default => 11,
+                };
+
+                // Filter slot waktu sesuai batas jam pelajaran per hari
+                $timeSlots = $allTimeSlots->filter(fn($slot) => $slot->period_number <= $limitPeriod);
+
                 $lockedSchedules = Schedule::where('academic_year_id', $academicYearId)
                     ->where('class_id', $class->id)
                     ->get()
@@ -201,7 +217,7 @@ class ScheduleGeneratorService
                 $dailySubjectUsage = [];
                 foreach ($lockedSchedules as $slotId => $sched) {
                     if ($sched->classSubjectTeacher) {
-                        $slot = $timeSlots->firstWhere('id', $slotId);
+                        $slot = $allTimeSlots->firstWhere('id', $slotId);
                         if ($slot) {
                             $csId = $sched->classSubjectTeacher->class_subject_id;
                             $dailySubjectUsage[$slot->day][$csId] = ($dailySubjectUsage[$slot->day][$csId] ?? 0) + 1;

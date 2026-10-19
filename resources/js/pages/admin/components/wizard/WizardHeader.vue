@@ -30,7 +30,7 @@
         </button>
       </div>
 
-      <!-- FILTER DROPDOWNS -->
+      <!-- FILTER DROPDOWNS & INPUT MAKS JP -->
       <div class="d-flex flex-wrap align-items-center gap-2">
         <!-- Filter Tahun Ajaran -->
         <select 
@@ -48,7 +48,7 @@
         <select 
           v-if="viewMode === 'class'"
           class="form-select form-select-sm bg-light border shadow-none" 
-          style="min-width: 180px;"
+          style="min-width: 150px;"
           :value="selectedClassId"
           @change="emit('update:selectedClassId', Number(($event.target as HTMLSelectElement).value))"
         >
@@ -62,7 +62,7 @@
         <select 
           v-if="viewMode === 'teacher'"
           class="form-select form-select-sm bg-light border shadow-none" 
-          style="min-width: 200px;"
+          style="min-width: 180px;"
           :value="selectedTeacherId"
           @change="emit('update:selectedTeacherId', Number(($event.target as HTMLSelectElement).value))"
         >
@@ -71,6 +71,20 @@
             {{ teacher.name }}
           </option>
         </select>
+
+        <!-- Input Pilihan Maksimal JP / Hari (Diperbaiki UI-nya agar tidak bentrok) -->
+        <div class="d-flex align-items-center bg-light border rounded-3 px-2.5 py-1 gap-2 ms-1" title="Batas Maksimal Jam Pelajaran Per Hari">
+          <i class="bi bi-clock-history text-muted fs-8"></i>
+          <span class="fs-8 text-secondary fw-medium">Maks JP:</span>
+          <select 
+            class="form-select form-select-sm border bg-white rounded-2 px-2 py-0 shadow-none fw-bold text-primary cursor-pointer" 
+            style="width: 72px; font-size: 0.82rem;"
+            :value="maxPeriodNumber"
+            @change="emit('update:maxPeriodNumber', Number(($event.target as HTMLSelectElement).value))"
+          >
+            <option v-for="n in 11" :key="n" :value="n">JP {{ n }}</option>
+          </select>
+        </div>
       </div>
 
       <!-- KONTROL AKSI UTAMA -->
@@ -90,7 +104,10 @@
           @click="emit('generate')"
           :disabled="isProcessing"
         >
-          <i class="bi bi-lightning-charge-fill"></i> Auto-Generate
+          <span v-if="!isProcessing" class="d-flex align-items-center gap-1.5">
+            <i class="bi bi-lightning-charge-fill text-warning"></i> Auto-Generate
+          </span>
+          <span v-else class="spinner-border spinner-border-sm" role="status"></span>
         </button>
 
         <button 
@@ -120,6 +137,7 @@ defineProps<{
   selectedAcademicYearId: number | null;
   selectedClassId: number | null;
   selectedTeacherId: number | null;
+  maxPeriodNumber: number;
   isProcessing: boolean;
 }>();
 
@@ -128,6 +146,7 @@ const emit = defineEmits([
   'update:selectedAcademicYearId', 
   'update:selectedClassId', 
   'update:selectedTeacherId',
+  'update:maxPeriodNumber',
   'generate',
   'reset',
   'publish'
@@ -137,5 +156,11 @@ const emit = defineEmits([
 <style scoped>
 .btn-white {
   background-color: #ffffff !important;
+}
+.fs-8 {
+  font-size: 0.75rem;
+}
+.cursor-pointer {
+  cursor: pointer;
 }
 </style>

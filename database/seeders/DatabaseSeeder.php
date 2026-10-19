@@ -18,7 +18,7 @@ class DatabaseSeeder extends Seeder
             'status' => 'active',
         ]);
 
-        // Jalankan Seeder Berurutan
+        // Jalankan Seeder Berurutan Sesuai Dependensi Relasi DB
         $this->call([
             TimeSlotSeeder::class,
             AcademicYearSeeder::class,

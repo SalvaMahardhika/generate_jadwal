@@ -18,6 +18,7 @@ export const useWizardStore = defineStore('wizard', () => {
   const selectedAcademicYearId = ref<number | null>(null);
   const selectedClassId = ref<number | null>(null);
   const selectedTeacherId = ref<number | null>(null);
+  const maxPeriodNumber = ref<number>(6); // Default 6 JP untuk Kelas 1
 
   const timeSlots = ref<TimeSlot[]>([]);
   const classMatrix = ref<ClassMatrixData | null>(null);
@@ -104,6 +105,7 @@ export const useWizardStore = defineStore('wizard', () => {
       const response = await WizardService.generate({
         academic_year_id: selectedAcademicYearId.value,
         class_id: classIdOnly,
+        max_period_number: maxPeriodNumber.value,
       });
 
       if (response.status === 'success') {
@@ -275,6 +277,7 @@ export const useWizardStore = defineStore('wizard', () => {
     selectedAcademicYearId,
     selectedClassId,
     selectedTeacherId,
+    maxPeriodNumber,
     timeSlots,
     classMatrix,
     teacherMatrix,
