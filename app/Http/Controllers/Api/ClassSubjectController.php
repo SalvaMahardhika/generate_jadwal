@@ -24,7 +24,7 @@ class ClassSubjectController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => [
-                'class' => $class->load(['grade', 'major', 'academicYear']),
+                'class' => $class->load(['grade', 'major', 'academicYear', 'homeroomTeacher']),
                 'subjects' => $assignments,
             ],
         ]);

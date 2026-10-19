@@ -32,8 +32,9 @@ const routes: Array<RouteRecordRaw> = [
   },
   {
     path: '/admin/class-subjects',
+    alias: '/admin/plotting',
     name: 'admin.class-subjects',
-    component: () => import('../pages/admin/Classes.vue'), // Placeholder halaman plotting
+    component: () => import('../pages/admin/ClassSubjects.vue'),
     meta: { requiresAuth: true },
   },
   {
