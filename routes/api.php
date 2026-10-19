@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\TimeSlotController;
 use App\Http\Controllers\Api\ClassController;
 use App\Http\Controllers\Api\ClassSubjectController;
 use App\Http\Controllers\Api\ScheduleWizardController;
+use App\Http\Controllers\Api\UserController;
 
 Route::prefix('v1')->group(function () {
 
@@ -22,6 +23,15 @@ Route::prefix('v1')->group(function () {
             Route::get('/me', [AuthController::class, 'me']);
             Route::post('/logout', [AuthController::class, 'logout']);
         });
+    });
+
+    // Manajemen Pengguna
+    Route::prefix('users')->group(function () {
+        Route::get('/', [UserController::class, 'index']);
+        Route::post('/', [UserController::class, 'store']);
+        Route::get('/{user}', [UserController::class, 'show']);
+        Route::put('/{user}', [UserController::class, 'update']);
+        Route::delete('/{user}', [UserController::class, 'destroy']);
     });
 
     // Tahun Ajaran
