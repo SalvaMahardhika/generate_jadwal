@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\ClassController;
 use App\Http\Controllers\Api\ClassSubjectController;
 use App\Http\Controllers\Api\ScheduleWizardController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\DashboardController;
 
 Route::prefix('v1')->group(function () {
 
@@ -23,6 +24,11 @@ Route::prefix('v1')->group(function () {
             Route::get('/me', [AuthController::class, 'me']);
             Route::post('/logout', [AuthController::class, 'logout']);
         });
+    });
+
+    // Dashboard
+    Route::prefix('dashboard')->group(function () {
+        Route::get('/stats', [DashboardController::class, 'stats']);
     });
 
     // Manajemen Pengguna

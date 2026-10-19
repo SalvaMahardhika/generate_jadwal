@@ -22,7 +22,10 @@
             <div class="d-flex align-items-center justify-content-between">
               <div>
                 <span class="text-muted small fw-medium text-uppercase" style="font-size: 0.7rem;">Total Guru</span>
-                <h4 class="fw-bold text-dark mb-0 mt-1">{{ stats.teachers }}</h4>
+                <h4 class="fw-bold text-dark mb-0 mt-1">
+                  <span v-if="isLoading" class="spinner-border spinner-border-sm text-primary" role="status"></span>
+                  <span v-else>{{ stats.teachers }}</span>
+                </h4>
               </div>
               <div class="stat-icon text-primary bg-primary-subtle rounded-3 d-flex align-items-center justify-content-center">
                 <i class="bi bi-person-badge fs-5"></i>
@@ -37,7 +40,10 @@
             <div class="d-flex align-items-center justify-content-between">
               <div>
                 <span class="text-muted small fw-medium text-uppercase" style="font-size: 0.7rem;">Total Kelas</span>
-                <h4 class="fw-bold text-dark mb-0 mt-1">{{ stats.classes }}</h4>
+                <h4 class="fw-bold text-dark mb-0 mt-1">
+                  <span v-if="isLoading" class="spinner-border spinner-border-sm text-primary" role="status"></span>
+                  <span v-else>{{ stats.classes }}</span>
+                </h4>
               </div>
               <div class="stat-icon text-primary bg-primary-subtle rounded-3 d-flex align-items-center justify-content-center">
                 <i class="bi bi-building fs-5"></i>
@@ -52,7 +58,10 @@
             <div class="d-flex align-items-center justify-content-between">
               <div>
                 <span class="text-muted small fw-medium text-uppercase" style="font-size: 0.7rem;">Mata Pelajaran</span>
-                <h4 class="fw-bold text-dark mb-0 mt-1">{{ stats.subjects }}</h4>
+                <h4 class="fw-bold text-dark mb-0 mt-1">
+                  <span v-if="isLoading" class="spinner-border spinner-border-sm text-primary" role="status"></span>
+                  <span v-else>{{ stats.subjects }}</span>
+                </h4>
               </div>
               <div class="stat-icon text-primary bg-primary-subtle rounded-3 d-flex align-items-center justify-content-center">
                 <i class="bi bi-book fs-5"></i>
@@ -67,7 +76,10 @@
             <div class="d-flex align-items-center justify-content-between">
               <div>
                 <span class="text-muted small fw-medium text-uppercase" style="font-size: 0.7rem;">Tahun Ajaran</span>
-                <h6 class="fw-bold text-dark mb-0 mt-1 fs-6 text-truncate">{{ stats.activeAcademicYear }}</h6>
+                <h6 class="fw-bold text-dark mb-0 mt-1 fs-6 text-truncate">
+                  <span v-if="isLoading" class="spinner-border spinner-border-sm text-primary" role="status"></span>
+                  <span v-else>{{ stats.activeAcademicYear }}</span>
+                </h6>
               </div>
               <div class="stat-icon text-primary bg-primary-subtle rounded-3 d-flex align-items-center justify-content-center">
                 <i class="bi bi-calendar-check fs-5"></i>
@@ -119,7 +131,11 @@
               <p class="text-secondary small mb-3">Gunakan Wizard Penjadwalan untuk menyusun atau menyesuaikan matriks jadwal aktif.</p>
               <div class="p-3 bg-light rounded-3 border">
                 <small class="text-muted d-block mb-1">Periode Aktif:</small>
-                <span class="fw-bold text-dark fs-7"><i class="bi bi-calendar3 me-1 text-primary"></i> {{ stats.activeAcademicYear }}</span>
+                <span class="fw-bold text-dark fs-7">
+                  <i class="bi bi-calendar3 me-1 text-primary"></i>
+                  <span v-if="isLoading" class="spinner-border spinner-border-sm text-primary ms-1" role="status"></span>
+                  <span v-else>{{ stats.activeAcademicYear }}</span>
+                </span>
               </div>
             </div>
 
@@ -138,15 +154,38 @@
 </template>
 
 <script setup lang="ts">
-import { reactive } from 'vue';
+import { ref, reactive, onMounted } from 'vue';
 import SidebarAdmin from '../../layouts/SidebarAdmin.vue';
+import { DashboardService } from '../../services/dashboard.service';
 
-// Mockup data ringkasan awal
+const isLoading = ref<boolean>(true);
+
 const stats = reactive({
-  teachers: '-',
-  classes: '-',
-  subjects: '-',
-  activeAcademicYear: '2024/2025 Ganjil',
+  teachers: '0',
+  classes: '0',
+  subjects: '0',
+  activeAcademicYear: '-',
+});
+
+const fetchDashboardStats = async () => {
+  isLoading.value = true;
+  try {
+    const response = await DashboardService.getStats();
+    if (response.status === 'success' && response.data) {
+      stats.teachers = String(response.data.teachers);
+      stats.classes = String(response.data.classes);
+      stats.subjects = String(response.data.subjects);
+      stats.activeAcademicYear = response.data.active_academic_year || '-';
+    }
+  } catch (error) {
+    console.error('Gagal memuat statistik dashboard:', error);
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+onMounted(() => {
+  fetchDashboardStats();
 });
 </script>
 
