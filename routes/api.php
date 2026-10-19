@@ -118,12 +118,22 @@ Route::prefix('v1')->group(function () {
 
     // Wizard Auto-Generate & Editor Jadwal
     Route::prefix('wizard')->group(function () {
-        Route::get('/matrix/{class}', [ScheduleWizardController::class, 'getMatrix']);
+        // Matriks Views
+        Route::get('/matrix/master', [ScheduleWizardController::class, 'getMasterMatrix']);
+        Route::get('/matrix/teacher/{teacher}', [ScheduleWizardController::class, 'getTeacherMatrix']);
+        Route::get('/matrix/class/{class}', [ScheduleWizardController::class, 'getMatrix']);
+        Route::get('/matrix/{class}', [ScheduleWizardController::class, 'getMatrix']); // Kompatibilitas rute lama
+        
         Route::get('/balance/{class}', [ScheduleWizardController::class, 'getBalance']);
+        
+        // Aksi Generator & Editor
         Route::post('/generate', [ScheduleWizardController::class, 'generate']);
         Route::post('/lock-slot', [ScheduleWizardController::class, 'lockSlot']);
         Route::post('/manual-assign', [ScheduleWizardController::class, 'manualAssign']);
+        Route::post('/clear-slot', [ScheduleWizardController::class, 'clearSlot']);
+        Route::post('/reset', [ScheduleWizardController::class, 'reset']);
         Route::post('/publish', [ScheduleWizardController::class, 'publish']);
+        Route::post('/unpublish', [ScheduleWizardController::class, 'unpublish']);
     });
 
 });

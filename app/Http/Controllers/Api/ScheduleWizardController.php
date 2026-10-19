@@ -7,6 +7,7 @@ use App\Http\Requests\Schedule\GenerateScheduleRequest;
 use App\Http\Requests\Schedule\LockSlotRequest;
 use App\Http\Requests\Schedule\ManualAssignScheduleRequest;
 use App\Models\Classes;
+use App\Models\Teacher;
 use App\Models\Schedule;
 use App\Models\TimeSlot;
 use App\Services\ScheduleGeneratorService;
@@ -21,7 +22,7 @@ class ScheduleWizardController extends Controller
     ) {}
 
     /**
-     * Mengambil matriks jadwal utuh per kelas untuk kanvas Wizard.
+     * 1. Class View: Matriks jadwal per kelas.
      */
     public function getMatrix(Request $request, Classes $class): JsonResponse
     {
@@ -54,7 +55,51 @@ class ScheduleWizardController extends Controller
     }
 
     /**
-     * Mengambil status keseimbangan JP (balance) untuk sidebar checklist UI.
+     * 2. Teacher View: Matriks jadwal per guru.
+     */
+    public function getTeacherMatrix(Request $request, Teacher $teacher): JsonResponse
+    {
+        $academicYearId = $request->query('academic_year_id');
+        if (!$academicYearId) {
+            return response()->json(['status' => 'error', 'message' => 'Academic year ID wajib diisi.'], 422);
+        }
+
+        $timeSlots = TimeSlot::orderByRaw("FIELD(day, 'senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu')")
+            ->orderBy('period_number', 'asc')
+            ->get();
+
+        $data = $this->generatorService->getTeacherMatrixData($teacher->id, (int)$academicYearId);
+
+        return response()->json([
+            'status' => 'success',
+            'data' => array_merge($data, ['time_slots' => $timeSlots]),
+        ]);
+    }
+
+    /**
+     * 3. Master View: Matriks jadwal makro seluruh kelas.
+     */
+    public function getMasterMatrix(Request $request): JsonResponse
+    {
+        $academicYearId = $request->query('academic_year_id');
+        if (!$academicYearId) {
+            return response()->json(['status' => 'error', 'message' => 'Academic year ID wajib diisi.'], 422);
+        }
+
+        $timeSlots = TimeSlot::orderByRaw("FIELD(day, 'senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu')")
+            ->orderBy('period_number', 'asc')
+            ->get();
+
+        $data = $this->generatorService->getMasterMatrixData((int)$academicYearId);
+
+        return response()->json([
+            'status' => 'success',
+            'data' => array_merge($data, ['time_slots' => $timeSlots]),
+        ]);
+    }
+
+    /**
+     * Mengambil status keseimbangan JP (balance) saja.
      */
     public function getBalance(Request $request, Classes $class): JsonResponse
     {
@@ -68,7 +113,7 @@ class ScheduleWizardController extends Controller
     }
 
     /**
-     * Menjalankan proses auto-generate jadwal otomatis.
+     * Auto-generate jadwal otomatis.
      */
     public function generate(GenerateScheduleRequest $request): JsonResponse
     {
@@ -116,7 +161,7 @@ class ScheduleWizardController extends Controller
     }
 
     /**
-     * Menempatkan mapel/kegiatan secara manual oleh admin.
+     * Menempatkan/mengubah mapel secara manual.
      */
     public function manualAssign(ManualAssignScheduleRequest $request): JsonResponse
     {
@@ -138,6 +183,52 @@ class ScheduleWizardController extends Controller
     }
 
     /**
+     * Mengosongkan 1 slot sel secara manual.
+     */
+    public function clearSlot(Request $request): JsonResponse
+    {
+        $request->validate([
+            'academic_year_id' => ['required', 'exists:academic_years,id'],
+            'class_id' => ['required', 'exists:classes,id'],
+            'time_slot_id' => ['required', 'exists:time_slots,id'],
+            'clear_all_classes' => ['nullable', 'boolean'],
+        ]);
+
+        $cleared = $this->generatorService->clearSlot(
+            $request->input('academic_year_id'),
+            $request->input('class_id'),
+            $request->input('time_slot_id'),
+            (bool) $request->input('clear_all_classes', false)
+        );
+
+        return response()->json([
+            'status' => 'success',
+            'message' => $cleared ? 'Slot berhasil dikosongkan.' : 'Slot sudah kosong.',
+        ]);
+    }
+
+    /**
+     * Reset / Hapus seluruh slot yang tidak terkunci.
+     */
+    public function reset(Request $request): JsonResponse
+    {
+        $request->validate([
+            'academic_year_id' => ['required', 'exists:academic_years,id'],
+            'class_id' => ['nullable', 'exists:classes,id'],
+        ]);
+
+        $affected = $this->generatorService->resetSchedule(
+            $request->input('academic_year_id'),
+            $request->input('class_id')
+        );
+
+        return response()->json([
+            'status' => 'success',
+            'message' => "Berhasil menghapus {$affected} entri jadwal yang tidak dikunci.",
+        ]);
+    }
+
+    /**
      * Mengunci dan mempublikasikan jadwal secara resmi.
      */
     public function publish(Request $request): JsonResponse
@@ -155,6 +246,27 @@ class ScheduleWizardController extends Controller
         return response()->json([
             'status' => 'success',
             'message' => "Berhasil mempublikasikan {$affected} entri jadwal.",
+        ]);
+    }
+
+    /**
+     * Mengembalikan status jadwal PUBLISHED menjadi DRAFT.
+     */
+    public function unpublish(Request $request): JsonResponse
+    {
+        $request->validate([
+            'academic_year_id' => ['required', 'exists:academic_years,id'],
+            'class_id' => ['nullable', 'exists:classes,id'],
+        ]);
+
+        $affected = $this->generatorService->unpublish(
+            $request->input('academic_year_id'),
+            $request->input('class_id')
+        );
+
+        return response()->json([
+            'status' => 'success',
+            'message' => "Berhasil mengembalikan {$affected} entri jadwal menjadi draft.",
         ]);
     }
 }

@@ -19,6 +19,8 @@ class ManualAssignScheduleRequest extends FormRequest
             'time_slot_id' => ['required', 'exists:time_slots,id'],
             'class_subject_teacher_id' => ['nullable', 'exists:class_subject_teachers,id'],
             'custom_activity' => ['nullable', 'string', 'max:255'],
+            'is_locked' => ['nullable', 'boolean'],
+            'apply_to_all_classes' => ['nullable', 'boolean'],
         ];
     }
 

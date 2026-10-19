@@ -26,6 +26,10 @@
             <i class="bi bi-magic me-2"></i>
             <span>Wizard Penjadwalan</span>
           </router-link>
+          <router-link to="/admin/schedules" class="nav-link-item" active-class="active">
+            <i class="bi bi-calendar-event-fill me-2"></i>
+            <span>Jadwal Resmi</span>
+          </router-link>
 
           <!-- GROUP: AKADEMIK & PEMETAAN -->
           <div class="menu-label text-uppercase text-muted fw-bold px-2 mt-3 mb-1">Akademik & Pemetaan</div>
