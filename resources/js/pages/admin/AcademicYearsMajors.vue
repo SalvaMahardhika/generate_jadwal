@@ -5,8 +5,8 @@
       <!-- Header Halaman -->
       <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-4 pb-2 border-bottom">
         <div>
-          <h5 class="fw-bold text-dark mb-1">Tahun Ajaran & Jurusan</h5>
-          <p class="text-secondary small mb-0">Kelola master data tahun ajaran aktif dan daftar jurusan sekolah.</p>
+          <h5 class="fw-bold text-dark mb-1">Master Data Akademik</h5>
+          <p class="text-secondary small mb-0">Kelola master data tahun ajaran aktif, daftar jurusan, dan tingkat/jenjang sekolah.</p>
         </div>
 
         <button 
@@ -20,13 +20,23 @@
         </button>
 
         <button 
-          v-else
+          v-else-if="activeTab === 'majors'"
           type="button" 
           class="btn btn-primary rounded-3 py-2 px-3 small fw-medium d-flex align-items-center gap-2"
           @click="openMajorModal()"
         >
           <i class="bi bi-plus-lg"></i>
           <span>Tambah Jurusan</span>
+        </button>
+
+        <button 
+          v-else-if="activeTab === 'grades'"
+          type="button" 
+          class="btn btn-primary rounded-3 py-2 px-3 small fw-medium d-flex align-items-center gap-2"
+          @click="openGradeModal()"
+        >
+          <i class="bi bi-plus-lg"></i>
+          <span>Tambah Tingkat</span>
         </button>
       </div>
 
@@ -57,6 +67,15 @@
             @click="activeTab = 'majors'"
           >
             <i class="bi bi-mortarboard me-2"></i>Jurusan
+          </button>
+        </li>
+        <li class="nav-item">
+          <button 
+            class="nav-link fw-semibold px-4 py-2.5 rounded-top-3 border-bottom-0"
+            :class="{ 'active text-primary bg-white border': activeTab === 'grades', 'text-muted bg-light': activeTab !== 'grades' }"
+            @click="activeTab = 'grades'"
+          >
+            <i class="bi bi-layers me-2"></i>Tingkat / Jenjang
           </button>
         </li>
       </ul>
@@ -280,6 +299,90 @@
         </div>
       </div>
 
+      <!-- TAB 3: TINGKAT / JENJANG -->
+      <div v-else-if="activeTab === 'grades'">
+        <!-- Filter Search Bar -->
+        <div class="card border rounded-3 p-3 bg-white mb-3">
+          <div class="row g-2 align-items-center">
+            <div class="col-12 col-md-6">
+              <div class="input-group input-group-sm">
+                <span class="input-group-text bg-light border-end-0 text-muted">
+                  <i class="bi bi-search"></i>
+                </span>
+                <input 
+                  type="text" 
+                  class="form-control bg-light border-start-0 shadow-none" 
+                  placeholder="Cari tingkat (contoh: Kelas 1, X, VII)..." 
+                  v-model="gradeStore.searchQuery"
+                  @input="gradeStore.fetchGrades()"
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Table Tingkat -->
+        <div class="card border rounded-3 bg-white overflow-hidden">
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead class="bg-light border-bottom">
+                <tr>
+                  <th scope="col" class="py-3 px-3 text-muted fw-semibold small" style="width: 50px;">#</th>
+                  <th scope="col" class="py-3 px-3 text-muted fw-semibold small">Nama Tingkat / Jenjang</th>
+                  <th scope="col" class="py-3 px-3 text-muted fw-semibold small">Urutan (Sequence)</th>
+                  <th scope="col" class="py-3 px-3 text-muted fw-semibold small text-end" style="width: 120px;">Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="gradeStore.isLoading">
+                  <td colspan="4" class="text-center py-5 text-muted small">
+                    <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                    Memuat data tingkat...
+                  </td>
+                </tr>
+
+                <tr v-else-if="gradeStore.grades.length === 0">
+                  <td colspan="4" class="text-center py-5 text-muted small">
+                    <i class="bi bi-layers fs-3 d-block mb-2 text-secondary"></i>
+                    Data tingkat/jenjang tidak ditemukan.
+                  </td>
+                </tr>
+
+                <tr v-else v-for="(grade, index) in gradeStore.grades" :key="grade.id">
+                  <td class="px-3 small text-secondary">{{ index + 1 }}</td>
+                  <td class="px-3 small fw-bold text-dark">{{ grade.grade_name }}</td>
+                  <td class="px-3 small">
+                    <span class="badge bg-light text-dark border rounded-pill px-2.5 py-1 fs-8">
+                      Urutan {{ grade.sequence }}
+                    </span>
+                  </td>
+                  <td class="px-3 text-end">
+                    <div class="d-flex justify-content-end gap-1">
+                      <button 
+                        type="button" 
+                        class="btn btn-light btn-sm text-secondary border-0 rounded-2 px-2 py-1"
+                        title="Edit"
+                        @click="openGradeModal(grade)"
+                      >
+                        <i class="bi bi-pencil-square fs-7"></i>
+                      </button>
+                      <button 
+                        type="button" 
+                        class="btn btn-light btn-sm text-danger border-0 rounded-2 px-2 py-1"
+                        title="Hapus"
+                        @click="openDeleteGradeModal(grade)"
+                      >
+                        <i class="bi bi-trash fs-7"></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
     </div>
 
     <!-- MODAL FORM TAHUN AJARAN -->
@@ -464,6 +567,78 @@
       </div>
     </Teleport>
 
+    <!-- MODAL FORM TINGKAT / JENJANG -->
+    <Teleport to="body">
+      <div v-if="showGradeModal" class="modal-backdrop fade show"></div>
+      <div v-if="showGradeModal" class="modal fade show d-block" tabindex="-1" @click.self="closeGradeModal">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content border-0 shadow-sm rounded-4 overflow-hidden bg-white">
+            
+            <div class="modal-header border-bottom px-4 py-3">
+              <h6 class="modal-title fw-bold text-dark">{{ isEditingGrade ? 'Edit Tingkat' : 'Tambah Tingkat Baru' }}</h6>
+              <button type="button" class="btn-close small shadow-none" @click="closeGradeModal" :disabled="gradeStore.isSaving"></button>
+            </div>
+
+            <form @submit.prevent="submitGrade">
+              <div class="modal-body p-4">
+                
+                <div class="mb-3">
+                  <label for="grade_name" class="form-label fw-medium text-dark small">Nama Tingkat / Jenjang <span class="text-danger">*</span></label>
+                  <input 
+                    type="text" 
+                    id="grade_name" 
+                    class="form-control form-control-sm rounded-3 shadow-none"
+                    :class="{ 'is-invalid': gradeErrors.grade_name }"
+                    placeholder="Contoh: Kelas 1, X, atau VII"
+                    v-model="gradeForm.grade_name"
+                    required
+                  >
+                  <div v-if="gradeErrors.grade_name" class="invalid-feedback small">{{ gradeErrors.grade_name[0] }}</div>
+                </div>
+
+                <div class="mb-2">
+                  <label for="sequence" class="form-label fw-medium text-dark small">Urutan (Sequence) <span class="text-danger">*</span></label>
+                  <input 
+                    type="number" 
+                    id="sequence" 
+                    class="form-control form-control-sm rounded-3 shadow-none"
+                    :class="{ 'is-invalid': gradeErrors.sequence }"
+                    placeholder="Contoh: 1 (untuk tingkat paling awal)"
+                    v-model="gradeForm.sequence"
+                    min="1"
+                    required
+                  >
+                  <div v-if="gradeErrors.sequence" class="invalid-feedback small">{{ gradeErrors.sequence[0] }}</div>
+                  <small class="text-muted d-block mt-1 fs-8">Urutan angka menentukan posisi hirarki jenjang dari bawah ke atas.</small>
+                </div>
+
+              </div>
+
+              <div class="modal-footer border-top px-4 py-3 bg-light">
+                <button 
+                  type="button" 
+                  class="btn btn-light rounded-3 py-2 px-3 small fw-medium border shadow-none"
+                  @click="closeGradeModal"
+                  :disabled="gradeStore.isSaving"
+                >
+                  Batal
+                </button>
+                <button 
+                  type="submit" 
+                  class="btn btn-primary rounded-3 py-2 px-3 small fw-semibold shadow-none d-flex align-items-center gap-2"
+                  :disabled="gradeStore.isSaving"
+                >
+                  <span v-if="!gradeStore.isSaving">Simpan</span>
+                  <span v-else class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <!-- MODAL DELETE (GENERIC CONFIRMATION) -->
     <Teleport to="body">
       <div v-if="showDeleteModal" class="modal-backdrop fade show"></div>
@@ -519,24 +694,28 @@ import { ref, reactive, computed, onMounted } from 'vue';
 import SidebarAdmin from '../../layouts/SidebarAdmin.vue';
 import { useAcademicYearStore } from '../../stores/academicYear';
 import { useMajorStore } from '../../stores/major';
+import { useGradeStore } from '../../stores/grade';
 import type { AcademicYear, AcademicYearPayload } from '../../types/academicYear';
 import type { Major, MajorPayload } from '../../types/major';
+import type { Grade, GradePayload } from '../../types/grade';
 
 const academicYearStore = useAcademicYearStore();
 const majorStore = useMajorStore();
+const gradeStore = useGradeStore();
 
-const activeTab = ref<'academic_years' | 'majors'>('academic_years');
+const activeTab = ref<'academic_years' | 'majors' | 'grades'>('academic_years');
 
 // Computed messages
 const currentSuccessMessage = computed(() => {
-  return activeTab.value === 'academic_years' 
-    ? academicYearStore.successMessage 
-    : majorStore.successMessage;
+  if (activeTab.value === 'academic_years') return academicYearStore.successMessage;
+  if (activeTab.value === 'majors') return majorStore.successMessage;
+  return gradeStore.successMessage;
 });
 
 const clearSuccessMessage = () => {
   academicYearStore.successMessage = null;
   majorStore.successMessage = null;
+  gradeStore.successMessage = null;
 };
 
 // --- ACADEMIC YEAR LOGIC ---
@@ -662,9 +841,72 @@ const submitMajor = async () => {
   }
 };
 
+// --- GRADE LOGIC ---
+const showGradeModal = ref(false);
+const isEditingGrade = ref(false);
+const selectedGrade = ref<Grade | null>(null);
+
+const gradeForm = reactive<GradePayload>({
+  grade_name: '',
+  sequence: '',
+});
+
+const gradeErrors = reactive<Record<string, string[]>>({});
+
+const resetGradeForm = () => {
+  gradeForm.grade_name = '';
+  gradeForm.sequence = '';
+  Object.keys(gradeErrors).forEach(key => delete gradeErrors[key]);
+};
+
+const openGradeModal = (grade?: Grade) => {
+  resetGradeForm();
+  if (grade) {
+    isEditingGrade.value = true;
+    selectedGrade.value = grade;
+    gradeForm.grade_name = grade.grade_name;
+    gradeForm.sequence = grade.sequence;
+  } else {
+    isEditingGrade.value = false;
+    selectedGrade.value = null;
+    // Auto sequence angka berikutnya
+    const maxSeq = gradeStore.grades.reduce((max, g) => (g.sequence > max ? g.sequence : max), 0);
+    gradeForm.sequence = maxSeq + 1;
+  }
+  showGradeModal.value = true;
+};
+
+const closeGradeModal = () => {
+  if (!gradeStore.isSaving) {
+    showGradeModal.value = false;
+  }
+};
+
+const submitGrade = async () => {
+  Object.keys(gradeErrors).forEach(key => delete gradeErrors[key]);
+
+  const payload: GradePayload = {
+    grade_name: gradeForm.grade_name.trim(),
+    sequence: Number(gradeForm.sequence),
+  };
+
+  let result;
+  if (isEditingGrade.value && selectedGrade.value) {
+    result = await gradeStore.updateGrade(selectedGrade.value.id, payload);
+  } else {
+    result = await gradeStore.createGrade(payload);
+  }
+
+  if (result.success) {
+    showGradeModal.value = false;
+  } else if (result.errors) {
+    Object.assign(gradeErrors, result.errors);
+  }
+};
+
 // --- DELETE MODAL LOGIC ---
 const showDeleteModal = ref(false);
-const deleteType = ref<'academic_year' | 'major'>('academic_year');
+const deleteType = ref<'academic_year' | 'major' | 'grade'>('academic_year');
 const deleteTargetId = ref<number | null>(null);
 const deleteTargetName = ref<string>('');
 const deleteErrorMessage = ref<string | null>(null);
@@ -686,6 +928,14 @@ const openDeleteMajorModal = (major: Major) => {
   showDeleteModal.value = true;
 };
 
+const openDeleteGradeModal = (grade: Grade) => {
+  deleteType.value = 'grade';
+  deleteTargetId.value = grade.id;
+  deleteTargetName.value = `Tingkat ${grade.grade_name}`;
+  deleteErrorMessage.value = null;
+  showDeleteModal.value = true;
+};
+
 const closeDeleteModal = () => {
   if (!isDeleting.value) {
     showDeleteModal.value = false;
@@ -701,8 +951,10 @@ const confirmDelete = async () => {
   let result;
   if (deleteType.value === 'academic_year') {
     result = await academicYearStore.deleteAcademicYear(deleteTargetId.value);
-  } else {
+  } else if (deleteType.value === 'major') {
     result = await majorStore.deleteMajor(deleteTargetId.value);
+  } else {
+    result = await gradeStore.deleteGrade(deleteTargetId.value);
   }
 
   isDeleting.value = false;
@@ -727,6 +979,7 @@ const formatDate = (dateStr: string) => {
 onMounted(() => {
   academicYearStore.fetchAcademicYears();
   majorStore.fetchMajors();
+  gradeStore.fetchGrades();
 });
 </script>
 
