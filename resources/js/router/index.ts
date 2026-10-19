@@ -25,6 +25,18 @@ const routes: Array<RouteRecordRaw> = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/admin/classes',
+    name: 'admin.classes',
+    component: () => import('../pages/admin/Classes.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/admin/class-subjects',
+    name: 'admin.class-subjects',
+    component: () => import('../pages/admin/Classes.vue'), // Placeholder halaman plotting
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/admin/teachers',
     name: 'admin.teachers',
     component: () => import('../pages/admin/Teachers.vue'),
