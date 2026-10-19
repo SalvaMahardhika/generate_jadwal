@@ -36,6 +36,12 @@ const routes: Array<RouteRecordRaw> = [
     component: () => import('../pages/admin/TimeSlots.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/admin/academic-years-majors',
+    name: 'admin.academic-years-majors',
+    component: () => import('../pages/admin/AcademicYearsMajors.vue'),
+    meta: { requiresAuth: true },
+  },
 ];
 
 const router = createRouter({
