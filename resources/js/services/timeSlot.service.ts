@@ -37,4 +37,12 @@ export const TimeSlotService = {
     const response = await api.delete<ApiResponse<null>>(`/time-slots/${id}`);
     return response.data;
   },
+
+  /**
+   * Menghapus seluruh slot waktu pada hari tertentu dalam 1 kali HTTP request.
+   */
+  async deleteByDay(day: string): Promise<ApiResponse<null>> {
+    const response = await api.delete<ApiResponse<null>>(`/time-slots/day/${day}`);
+    return response.data;
+  },
 };

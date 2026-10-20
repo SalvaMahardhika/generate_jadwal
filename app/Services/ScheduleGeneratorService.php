@@ -134,7 +134,7 @@ class ScheduleGeneratorService
     }
 
     /**
-     * Eksekusi Algoritma Auto-Generate Jadwal.
+     * Eksekusi Algoritma Auto-Generate Jadwal Berbasis Blok Berurutan (Block Periods).
      */
     public function generate(int $academicYearId, ?int $classId = null, int $userId = 1, ?int $maxPeriodNumber = null): array
     {
@@ -152,10 +152,17 @@ class ScheduleGeneratorService
                 throw new Exception('Tidak ada kelas aktif yang ditemukan untuk di-generate.', 404);
             }
 
-            // Urutkan period_number ASC terlebih dahulu agar JP terbagi merata dari Senin sampai Jumat
+            // Hitung statistik berapa banyak kelas yang diampu setiap guru (identifikasi guru spesialis lintas kelas)
+            $teacherClassCounts = DB::table('class_subject_teachers')
+                ->join('class_subjects', 'class_subjects.id', '=', 'class_subject_teachers.class_subject_id')
+                ->select('class_subject_teachers.teacher_id', DB::raw('COUNT(DISTINCT class_subjects.class_id) as class_count'))
+                ->groupBy('class_subject_teachers.teacher_id')
+                ->pluck('class_count', 'teacher_id');
+
+            // Ambil seluruh slot waktu non-istirahat, diurutkan berdasarkan Hari lalu Jam ke-
             $allTimeSlots = TimeSlot::where('is_break', false)
-                ->orderBy('period_number', 'asc')
                 ->orderByRaw("FIELD(day, 'senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu')")
+                ->orderBy('period_number', 'asc')
                 ->get();
 
             // Hapus draft jadwal lama yang TIDAK dikunci
@@ -169,26 +176,40 @@ class ScheduleGeneratorService
             foreach ($classes as $class) {
                 $sequence = $class->grade?->sequence ?? 1;
 
-                // Tentukan batas jam: gunakan input kustom dari Wizard jika dikirim, atau fallback ke default jenjang
                 $limitPeriod = $maxPeriodNumber ?: match ($sequence) {
                     1, 2    => 6,
                     3, 4    => 8,
                     default => 11,
                 };
 
-                // Filter slot waktu sesuai batas jam pelajaran per hari
-                $timeSlots = $allTimeSlots->filter(fn($slot) => $slot->period_number <= $limitPeriod);
+                // Filter slot waktu khusus kelas ini dan kelompokkan per hari
+                $classTimeSlots = $allTimeSlots->filter(fn($slot) => $slot->period_number <= $limitPeriod);
+                $slotsByDay = $classTimeSlots->groupBy('day');
 
                 $lockedSchedules = Schedule::where('academic_year_id', $academicYearId)
                     ->where('class_id', $class->id)
                     ->get()
                     ->keyBy('time_slot_id');
 
-                $jpPool = [];
                 $classSubjects = ClassSubject::with('classSubjectTeachers')
                     ->where('class_id', $class->id)
                     ->where('status', 'active')
                     ->get();
+
+                // Catat penggunaan harian per mapel
+                $dailySubjectUsage = [];
+                foreach ($lockedSchedules as $slotId => $sched) {
+                    if ($sched->classSubjectTeacher) {
+                        $slot = $allTimeSlots->firstWhere('id', $slotId);
+                        if ($slot) {
+                            $csId = $sched->classSubjectTeacher->class_subject_id;
+                            $dailySubjectUsage[$slot->day][$csId] = ($dailySubjectUsage[$slot->day][$csId] ?? 0) + 1;
+                        }
+                    }
+                }
+
+                // Bentuk Paket Blok JP (Block Pool)
+                $blockPool = [];
 
                 foreach ($classSubjects as $cs) {
                     $cst = $cs->classSubjectTeachers->first();
@@ -201,72 +222,82 @@ class ScheduleGeneratorService
                     })->count();
 
                     $remainingToPlace = $cs->total_jp - $alreadyPlacedCount;
+                    if ($remainingToPlace <= 0) {
+                        continue;
+                    }
 
-                    for ($i = 0; $i < $remainingToPlace; $i++) {
-                        $jpPool[] = [
+                    $maxJpPerDay = max(1, $cs->max_jp_per_day);
+                    $teacherId = $cst->teacher_id;
+                    $isSpecialist = ($teacherClassCounts->get($teacherId, 1) > 1);
+
+                    // Pecah total JP sisa menjadi blok berurutan (misal: 2 JP + 2 JP + 1 JP)
+                    while ($remainingToPlace > 0) {
+                        $blockSize = min($remainingToPlace, $maxJpPerDay);
+                        $blockPool[] = [
                             'class_subject_id' => $cs->id,
                             'class_subject_teacher_id' => $cst->id,
-                            'teacher_id' => $cst->teacher_id,
+                            'teacher_id' => $teacherId,
                             'max_jp_per_day' => $cs->max_jp_per_day,
+                            'size' => $blockSize,
+                            'is_specialist' => $isSpecialist,
                         ];
+                        $remainingToPlace -= $blockSize;
                     }
                 }
 
-                shuffle($jpPool);
-
-                $dailySubjectUsage = [];
-                foreach ($lockedSchedules as $slotId => $sched) {
-                    if ($sched->classSubjectTeacher) {
-                        $slot = $allTimeSlots->firstWhere('id', $slotId);
-                        if ($slot) {
-                            $csId = $sched->classSubjectTeacher->class_subject_id;
-                            $dailySubjectUsage[$slot->day][$csId] = ($dailySubjectUsage[$slot->day][$csId] ?? 0) + 1;
-                        }
+                // Urutkan Blok Prioritas:
+                // 1. Guru Spesialis Lintas Kelas lebih dulu
+                // 2. Ukuran Blok Lebih Besar (2 JP) lebih dulu dibanding 1 JP
+                usort($blockPool, function ($a, $b) {
+                    if ($a['is_specialist'] !== $b['is_specialist']) {
+                        return $b['is_specialist'] <=> $a['is_specialist'];
                     }
-                }
-
-                foreach ($jpPool as $item) {
-                    $placed = false;
-
-                    foreach ($timeSlots as $slot) {
-                        if ($lockedSchedules->has($slot->id)) {
-                            continue;
-                        }
-
-                        $currentDailyUsage = $dailySubjectUsage[$slot->day][$item['class_subject_id']] ?? 0;
-                        if ($currentDailyUsage >= $item['max_jp_per_day']) {
-                            continue;
-                        }
-
-                        $hasConflict = $this->checkTeacherConflict(
-                            $item['teacher_id'],
-                            $slot->id,
-                            $academicYearId
-                        );
-
-                        if (!$hasConflict) {
-                            Schedule::create([
-                                'academic_year_id' => $academicYearId,
-                                'class_id' => $class->id,
-                                'time_slot_id' => $slot->id,
-                                'class_subject_teacher_id' => $item['class_subject_teacher_id'],
-                                'is_locked' => false,
-                                'status' => 'draft',
-                                'created_by' => $userId,
-                            ]);
-
-                            $lockedSchedules->put($slot->id, true);
-                            $dailySubjectUsage[$slot->day][$item['class_subject_id']] = $currentDailyUsage + 1;
-                            $placed = true;
-                            break;
-                        }
+                    if ($a['size'] !== $b['size']) {
+                        return $b['size'] <=> $a['size'];
                     }
+                    return rand(-1, 1);
+                });
 
-                    if (!$placed) {
+                // Tempatkan Masing-Masing Blok ke Slot Berurutan
+                foreach ($blockPool as $block) {
+                    $placed = $this->tryPlaceBlock(
+                        $block,
+                        $slotsByDay,
+                        $lockedSchedules,
+                        $dailySubjectUsage,
+                        $academicYearId,
+                        $class->id,
+                        $userId
+                    );
+
+                    // Jika blok ukuran 2 JP gagal ditempatkanutuh, coba pecah menjadi 1 JP terpisah
+                    if (!$placed && $block['size'] > 1) {
+                        for ($s = 0; $s < $block['size']; $s++) {
+                            $singleBlock = $block;
+                            $singleBlock['size'] = 1;
+                            $singlePlaced = $this->tryPlaceBlock(
+                                $singleBlock,
+                                $slotsByDay,
+                                $lockedSchedules,
+                                $dailySubjectUsage,
+                                $academicYearId,
+                                $class->id,
+                                $userId
+                            );
+
+                            if (!$singlePlaced) {
+                                $unplacedPool[] = [
+                                    'class_id' => $class->id,
+                                    'class_name' => $class->class_name,
+                                    'class_subject_id' => $block['class_subject_id'],
+                                ];
+                            }
+                        }
+                    } elseif (!$placed) {
                         $unplacedPool[] = [
                             'class_id' => $class->id,
                             'class_name' => $class->class_name,
-                            'class_subject_id' => $item['class_subject_id'],
+                            'class_subject_id' => $block['class_subject_id'],
                         ];
                     }
                 }
@@ -278,6 +309,93 @@ class ScheduleGeneratorService
                 'unplaced_details' => $unplacedPool,
             ];
         });
+    }
+
+    /**
+     * Mencoba menempatkan paket blok K jam pelajaran pada slot berurutan di hari yang sama.
+     */
+    private function tryPlaceBlock(
+        array $block,
+        Collection $slotsByDay,
+        Collection &$lockedSchedules,
+        array &$dailySubjectUsage,
+        int $academicYearId,
+        int $classId,
+        int $userId
+    ): bool {
+        $blockSize = $block['size'];
+        $csId = $block['class_subject_id'];
+        $maxJpPerDay = $block['max_jp_per_day'];
+        $teacherId = $block['teacher_id'];
+
+        $days = $slotsByDay->keys()->toArray();
+
+        // Urutkan hari berdasarkan hari yang penggunaan mapel ini paling sedikit (distribusi merata per hari)
+        usort($days, function ($dayA, $dayB) use ($dailySubjectUsage, $csId) {
+            $usageA = $dailySubjectUsage[$dayA][$csId] ?? 0;
+            $usageB = $dailySubjectUsage[$dayB][$csId] ?? 0;
+            return $usageA <=> $usageB;
+        });
+
+        foreach ($days as $day) {
+            $daySlots = $slotsByDay->get($day, collect())->values();
+            $slotCount = $daySlots->count();
+
+            if ($slotCount < $blockSize) {
+                continue;
+            }
+
+            $currentDailyUsage = $dailySubjectUsage[$day][$csId] ?? 0;
+            if ($currentDailyUsage + $blockSize > $maxJpPerDay) {
+                continue;
+            }
+
+            // Cari kandidat $blockSize slot berurutan dalam hari ini
+            for ($i = 0; $i <= $slotCount - $blockSize; $i++) {
+                $candidateSlots = [];
+                $canPlace = true;
+
+                for ($k = 0; $k < $blockSize; $k++) {
+                    $slot = $daySlots->get($i + $k);
+
+                    // 1. Cek apakah slot sudah terisi di kelas ini
+                    if ($lockedSchedules->has($slot->id)) {
+                        $canPlace = false;
+                        break;
+                    }
+
+                    // 2. Cek apakah guru sedang mengajar di kelas lain pada slot ini
+                    if ($this->checkTeacherConflict($teacherId, $slot->id, $academicYearId)) {
+                        $canPlace = false;
+                        break;
+                    }
+
+                    $candidateSlots[] = $slot;
+                }
+
+                if ($canPlace) {
+                    // Simpan seluruh slot dalam blok sekaligus
+                    foreach ($candidateSlots as $slot) {
+                        Schedule::create([
+                            'academic_year_id' => $academicYearId,
+                            'class_id' => $classId,
+                            'time_slot_id' => $slot->id,
+                            'class_subject_teacher_id' => $block['class_subject_teacher_id'],
+                            'is_locked' => false,
+                            'status' => 'draft',
+                            'created_by' => $userId,
+                        ]);
+
+                        $lockedSchedules->put($slot->id, true);
+                    }
+
+                    $dailySubjectUsage[$day][$csId] = $currentDailyUsage + $blockSize;
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -303,7 +421,7 @@ class ScheduleGeneratorService
     }
 
     /**
-     * Penempatan / penggeseran jadwal secara manual.
+     * Penempatan / penggeseran jadwal secara manual dengan pengetatan validasi bentrok guru.
      */
     public function manualAssign(array $data, int $userId): ?Schedule
     {

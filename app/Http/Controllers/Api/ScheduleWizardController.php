@@ -122,7 +122,8 @@ class ScheduleWizardController extends Controller
             $result = $this->generatorService->generate(
                 $request->input('academic_year_id'),
                 $request->input('class_id'),
-                $userId
+                $userId,
+                $request->input('max_period_number')
             );
 
             return response()->json([
@@ -131,10 +132,13 @@ class ScheduleWizardController extends Controller
                 'data' => $result,
             ]);
         } catch (Exception $e) {
+            $code = (int) $e->getCode();
+            $statusCode = ($code >= 400 && $code <= 599) ? $code : 500;
+
             return response()->json([
                 'status' => 'error',
                 'message' => $e->getMessage(),
-            ], $e->getCode() ?: 500);
+            ], $statusCode);
         }
     }
 
@@ -153,10 +157,13 @@ class ScheduleWizardController extends Controller
                 'data' => $schedule,
             ]);
         } catch (Exception $e) {
+            $code = (int) $e->getCode();
+            $statusCode = ($code >= 400 && $code <= 599) ? $code : 500;
+
             return response()->json([
                 'status' => 'error',
                 'message' => $e->getMessage(),
-            ], $e->getCode() ?: 500);
+            ], $statusCode);
         }
     }
 
@@ -175,10 +182,13 @@ class ScheduleWizardController extends Controller
                 'data' => $schedule,
             ]);
         } catch (Exception $e) {
+            $code = (int) $e->getCode();
+            $statusCode = ($code >= 400 && $code <= 599) ? $code : 500;
+
             return response()->json([
                 'status' => 'error',
                 'message' => $e->getMessage(),
-            ], $e->getCode() ?: 500);
+            ], $statusCode);
         }
     }
 

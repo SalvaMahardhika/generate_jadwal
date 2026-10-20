@@ -73,10 +73,36 @@ class TimeSlotController extends Controller
                 'message' => 'Slot waktu berhasil dihapus.',
             ]);
         } catch (Exception $e) {
+            $code = (int) $e->getCode();
+            $statusCode = ($code >= 400 && $code <= 599) ? $code : 500;
+
             return response()->json([
                 'status' => 'error',
                 'message' => $e->getMessage(),
-            ], $e->getCode() ?: 500);
+            ], $statusCode);
+        }
+    }
+
+    /**
+     * Menghapus seluruh slot waktu pada hari tertentu (Bulk Delete).
+     */
+    public function clearByDay(string $day): JsonResponse
+    {
+        try {
+            $affected = $this->timeSlotService->deleteByDay($day);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => "Berhasil menghapus {$affected} slot waktu pada hari " . ucfirst($day) . ".",
+            ]);
+        } catch (Exception $e) {
+            $code = (int) $e->getCode();
+            $statusCode = ($code >= 400 && $code <= 599) ? $code : 500;
+
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage(),
+            ], $statusCode);
         }
     }
 }

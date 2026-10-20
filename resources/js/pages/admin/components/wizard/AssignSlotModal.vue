@@ -1,29 +1,38 @@
 <template>
   <Teleport to="body">
     <div v-if="show" class="modal-backdrop fade show"></div>
-    <div v-if="show" class="modal fade show d-block" tabindex="-1" @click.self="emit('close')">
+    <div v-if="show" class="modal fade show d-block" tabindex="-1" @click.self="handleClose">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-sm rounded-4 overflow-hidden bg-white">
           
+          <!-- MODAL HEADER -->
           <div class="modal-header border-bottom px-4 py-3">
             <div>
               <h6 class="modal-title fw-bold text-dark mb-0">Atur Slot Jadwal</h6>
               <small class="text-muted fs-8" v-if="timeSlot">
-                {{ capitalize(timeSlot.day) }} - Jam ke-{{ timeSlot.period_number }} ({{ timeSlot.start_time.substring(0, 5) }} - {{ timeSlot.end_time.substring(0, 5) }})
+                {{ capitalize(timeSlot.day) }} - Jam ke-{{ timeSlot.period_number }} 
+                ({{ formatTime(timeSlot.start_time) }} - {{ formatTime(timeSlot.end_time) }})
               </small>
             </div>
-            <button type="button" class="btn-close small shadow-none" @click="emit('close')" :disabled="isProcessing"></button>
+            <button 
+              type="button" 
+              class="btn-close small shadow-none" 
+              @click="handleClose" 
+              :disabled="isProcessing"
+            ></button>
           </div>
 
+          <!-- MODAL BODY -->
           <div class="modal-body p-4">
-            <!-- Navigasi Tipe Isian -->
+            
+            <!-- Navigasi Tipe Isian (Mapel vs Rutin) -->
             <ul class="nav nav-pills nav-fill bg-light p-1 rounded-3 mb-3">
               <li class="nav-item">
                 <button 
                   type="button" 
-                  class="nav-link py-1.5 px-3 fs-8 fw-semibold rounded-2"
+                  class="nav-link py-1.5 px-3 fs-8 fw-semibold rounded-2 transition-all"
                   :class="{ 'active bg-white text-primary shadow-sm': slotType === 'subject' }"
-                  @click="slotType = 'subject'"
+                  @click="switchSlotType('subject')"
                 >
                   <i class="bi bi-journal-bookmark me-1"></i> Mata Pelajaran
                 </button>
@@ -31,9 +40,9 @@
               <li class="nav-item">
                 <button 
                   type="button" 
-                  class="nav-link py-1.5 px-3 fs-8 fw-semibold rounded-2"
+                  class="nav-link py-1.5 px-3 fs-8 fw-semibold rounded-2 transition-all"
                   :class="{ 'active bg-white text-primary shadow-sm': slotType === 'routine' }"
-                  @click="slotType = 'routine'"
+                  @click="switchSlotType('routine')"
                 >
                   <i class="bi bi-flag me-1"></i> Kegiatan Rutin / Non-Mapel
                 </button>
@@ -45,7 +54,7 @@
               <div class="mb-3">
                 <label class="form-label fw-medium text-dark small">Pilih Mapel & Guru Pengampu <span class="text-danger">*</span></label>
                 <select 
-                  class="form-select form-select-sm rounded-3 shadow-none"
+                  class="form-select form-select-sm rounded-3 shadow-none border-secondary-subtle"
                   v-model="form.class_subject_teacher_id"
                 >
                   <option :value="null">-- Pilih Mata Pelajaran --</option>
@@ -54,7 +63,7 @@
                     :key="cst.id" 
                     :value="cst.id"
                   >
-                    {{ cst.class_subject?.subject?.subject_name }} - {{ cst.teacher?.name }}
+                    {{ cst.class_subject?.subject?.subject_name ?? '-' }} - {{ cst.teacher?.name ?? '-' }}
                   </option>
                 </select>
               </div>
@@ -66,7 +75,7 @@
                 <label class="form-label fw-medium text-dark small">Nama Kegiatan Rutin <span class="text-danger">*</span></label>
                 <input 
                   type="text" 
-                  class="form-control form-control-sm rounded-3 shadow-none"
+                  class="form-control form-control-sm rounded-3 shadow-none border-secondary-subtle"
                   placeholder="Contoh: UPACARA, Senam Pagi, ISHOMA, Dhuha"
                   v-model="form.custom_activity"
                 >
@@ -76,7 +85,7 @@
             <!-- TOGGLE KUNCI SLOT -->
             <div class="form-check form-switch p-2.5 bg-light rounded-3 border mb-2">
               <input 
-                class="form-check-input shadow-none ms-0 me-2" 
+                class="form-check-input shadow-none ms-0 me-2 cursor-pointer" 
                 type="checkbox" 
                 id="lock_switch"
                 v-model="form.is_locked"
@@ -93,7 +102,7 @@
             <!-- TOGGLE TERAPKAN UNTUK SEMUA KELAS -->
             <div class="form-check form-switch p-2.5 bg-light rounded-3 border mb-2">
               <input 
-                class="form-check-input shadow-none ms-0 me-2" 
+                class="form-check-input shadow-none ms-0 me-2 cursor-pointer" 
                 type="checkbox" 
                 id="apply_all_switch"
                 v-model="form.apply_to_all_classes"
@@ -109,7 +118,9 @@
 
           </div>
 
+          <!-- MODAL FOOTER -->
           <div class="modal-footer border-top px-4 py-3 bg-light d-flex justify-content-between align-items-center">
+            
             <!-- Pilihan Kosongkan Slot -->
             <div v-if="currentSchedule" class="position-relative">
               <button 
@@ -122,7 +133,11 @@
                 <i class="bi bi-chevron-up fs-9 ms-1"></i>
               </button>
 
-              <div v-if="showClearMenu" class="position-absolute bottom-100 start-0 mb-1 bg-white border rounded-3 shadow-sm p-1 z-3" style="min-width: 180px;">
+              <div 
+                v-if="showClearMenu" 
+                class="position-absolute bottom-100 start-0 mb-1 bg-white border rounded-3 shadow-sm p-1" 
+                style="min-width: 180px; z-index: 1050;"
+              >
                 <button 
                   type="button" 
                   class="btn btn-light btn-sm w-100 text-start fs-8 py-1.5 px-2 rounded-2 mb-1 border-0"
@@ -140,11 +155,12 @@
               </div>
             </div>
 
+            <!-- Tombol Aksi Batal & Simpan -->
             <div class="ms-auto d-flex gap-2">
               <button 
                 type="button" 
                 class="btn btn-light rounded-3 py-1.5 px-3 small fw-medium border shadow-none"
-                @click="emit('close')"
+                @click="handleClose"
                 :disabled="isProcessing"
               >
                 Batal
@@ -159,6 +175,7 @@
                 <span v-else class="spinner-border spinner-border-sm" role="status"></span>
               </button>
             </div>
+
           </div>
 
         </div>
@@ -191,14 +208,16 @@ const form = reactive({
   apply_to_all_classes: false,
 });
 
-watch(() => slotType.value, (newType) => {
-  if (newType === 'routine') {
+const switchSlotType = (type: 'subject' | 'routine') => {
+  slotType.value = type;
+  showClearMenu.value = false;
+  if (type === 'routine') {
     form.is_locked = true;
     form.apply_to_all_classes = true;
   } else {
     form.apply_to_all_classes = false;
   }
-});
+};
 
 watch(() => props.show, (newVal) => {
   if (newVal) {
@@ -219,7 +238,13 @@ watch(() => props.show, (newVal) => {
   }
 });
 
+const handleClose = () => {
+  showClearMenu.value = false;
+  emit('close');
+};
+
 const handleSave = () => {
+  showClearMenu.value = false;
   emit('save', {
     class_subject_teacher_id: slotType.value === 'subject' ? form.class_subject_teacher_id : null,
     custom_activity: slotType.value === 'routine' ? (form.custom_activity.trim() || null) : null,
@@ -233,7 +258,12 @@ const handleClear = (clearAllClasses: boolean = false) => {
   emit('clear', { clear_all_classes: clearAllClasses });
 };
 
-const capitalize = (str: string) => str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
+const capitalize = (str: string) => (str ? str.charAt(0).toUpperCase() + str.slice(1) : '');
+
+const formatTime = (timeStr?: string | null) => {
+  if (!timeStr) return '--:--';
+  return timeStr.length >= 5 ? timeStr.substring(0, 5) : timeStr;
+};
 </script>
 
 <style scoped>
@@ -245,5 +275,8 @@ const capitalize = (str: string) => str ? str.charAt(0).toUpperCase() + str.slic
 }
 .fs-9 {
   font-size: 0.65rem;
+}
+.transition-all {
+  transition: all 0.2s ease-in-out;
 }
 </style>

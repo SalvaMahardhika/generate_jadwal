@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, reactive } from 'vue';
 import { TimeSlotService } from '../services/timeSlot.service';
-import type { TimeSlot, TimeSlotPayload, TimeSlotFilter } from '../types/timeSlot';
+import type { TimeSlot, TimeSlotPayload, TimeSlotFilter, DayOfWeek } from '../types/timeSlot';
 
 export const useTimeSlotStore = defineStore('timeSlot', () => {
   const timeSlots = ref<TimeSlot[]>([]);
@@ -96,6 +96,27 @@ export const useTimeSlotStore = defineStore('timeSlot', () => {
     }
   };
 
+  const deleteTimeSlotsByDay = async (day: DayOfWeek) => {
+    isSaving.value = true;
+    errorMessage.value = null;
+
+    try {
+      const response = await TimeSlotService.deleteByDay(day);
+      if (response.status === 'success') {
+        successMessage.value = response.message || `Seluruh slot waktu di hari ${day} berhasil dihapus.`;
+        await fetchTimeSlots();
+        return { success: true };
+      }
+      return { success: false, message: response.message };
+    } catch (error: any) {
+      const msg = error.response?.data?.message || `Gagal menghapus slot waktu di hari ${day}.`;
+      errorMessage.value = msg;
+      return { success: false, message: msg };
+    } finally {
+      isSaving.value = false;
+    }
+  };
+
   const resetFilters = () => {
     filters.day = '';
     filters.is_break = '';
@@ -113,6 +134,7 @@ export const useTimeSlotStore = defineStore('timeSlot', () => {
     createTimeSlot,
     updateTimeSlot,
     deleteTimeSlot,
+    deleteTimeSlotsByDay,
     resetFilters,
   };
 });

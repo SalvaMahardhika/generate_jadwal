@@ -37,4 +37,23 @@ class TimeSlotService
 
         return $timeSlot->delete();
     }
+
+    /**
+     * Menghapus seluruh slot waktu pada hari tertentu dalam 1 query transaksi.
+     */
+    public function deleteByDay(string $day): int
+    {
+        $dayLower = strtolower($day);
+
+        // Periksa apakah ada salah satu slot pada hari tersebut yang sudah terpakai di jadwal
+        $hasSchedules = TimeSlot::where('day', $dayLower)
+            ->whereHas('schedules')
+            ->exists();
+
+        if ($hasSchedules) {
+            throw new Exception("Tidak dapat menghapus slot waktu pada hari {$day} karena ada slot yang sudah terikat dengan data jadwal.", 422);
+        }
+
+        return TimeSlot::where('day', $dayLower)->delete();
+    }
 }
