@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, reactive } from 'vue';
 import { TimeSlotService } from '../services/timeSlot.service';
-import type { TimeSlot, TimeSlotPayload, TimeSlotFilter, DayOfWeek } from '../types/timeSlot';
+import type { TimeSlot, TimeSlotPayload, TimeSlotFilter, DayOfWeek, GenerateTimeSlotPayload } from '../types/timeSlot';
 
 export const useTimeSlotStore = defineStore('timeSlot', () => {
   const timeSlots = ref<TimeSlot[]>([]);
@@ -117,6 +117,28 @@ export const useTimeSlotStore = defineStore('timeSlot', () => {
     }
   };
 
+  const generateTimeSlots = async (payload: GenerateTimeSlotPayload) => {
+    isSaving.value = true;
+    errorMessage.value = null;
+    successMessage.value = null;
+
+    try {
+      const response = await TimeSlotService.generate(payload);
+      if (response.status === 'success') {
+        successMessage.value = response.message || 'Slot waktu berhasil di-generate secara otomatis.';
+        await fetchTimeSlots();
+        return { success: true };
+      }
+      return { success: false, message: response.message };
+    } catch (error: any) {
+      const msg = error.response?.data?.message || 'Gagal meng-generate slot waktu.';
+      errorMessage.value = msg;
+      return { success: false, message: msg, errors: error.response?.data?.errors };
+    } finally {
+      isSaving.value = false;
+    }
+  };
+
   const resetFilters = () => {
     filters.day = '';
     filters.is_break = '';
@@ -135,6 +157,7 @@ export const useTimeSlotStore = defineStore('timeSlot', () => {
     updateTimeSlot,
     deleteTimeSlot,
     deleteTimeSlotsByDay,
+    generateTimeSlots,
     resetFilters,
   };
 });

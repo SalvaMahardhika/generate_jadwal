@@ -8,14 +8,27 @@
           <h5 class="fw-bold text-dark mb-1">Jam & Slot Waktu</h5>
           <p class="text-secondary small mb-0">Kelola master jam pelajaran (JP), jam istirahat, dan alokasi waktu per hari.</p>
         </div>
-        <button 
-          type="button" 
-          class="btn btn-primary rounded-3 py-2 px-3 small fw-medium d-flex align-items-center gap-2"
-          @click="openCreateModal()"
-        >
-          <i class="bi bi-plus-lg"></i>
-          <span>Tambah Slot Waktu</span>
-        </button>
+        <div class="d-flex align-items-center gap-2">
+          <!-- Tombol Generate Otomatis -->
+          <button 
+            type="button" 
+            class="btn btn-outline-primary rounded-3 py-2 px-3 small fw-medium d-flex align-items-center gap-2"
+            @click="openGenerateModal()"
+          >
+            <i class="bi bi-magic"></i>
+            <span>Generate Otomatis</span>
+          </button>
+
+          <!-- Tombol Tambah Slot Waktu Manual -->
+          <button 
+            type="button" 
+            class="btn btn-primary rounded-3 py-2 px-3 small fw-medium d-flex align-items-center gap-2"
+            @click="openCreateModal()"
+          >
+            <i class="bi bi-plus-lg"></i>
+            <span>Tambah Slot Waktu</span>
+          </button>
+        </div>
       </div>
 
       <!-- Alert Pesan Sukses -->
@@ -25,6 +38,15 @@
           <span>{{ timeSlotStore.successMessage }}</span>
         </div>
         <button type="button" class="btn-close small" @click="timeSlotStore.successMessage = null"></button>
+      </div>
+
+      <!-- Alert Pesan Error Global -->
+      <div v-if="timeSlotStore.errorMessage" class="alert alert-danger border-0 rounded-3 py-2 px-3 small d-flex align-items-center justify-content-between mb-3" role="alert">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-exclamation-triangle-fill"></i>
+          <span>{{ timeSlotStore.errorMessage }}</span>
+        </div>
+        <button type="button" class="btn-close small" @click="timeSlotStore.errorMessage = null"></button>
       </div>
 
       <!-- Filter Bar -->
@@ -52,7 +74,7 @@
 
     </div>
 
-    <!-- Modal Form (Tambah / Edit) -->
+    <!-- Modal Form (Tambah / Edit Manual) -->
     <TimeSlotFormModal 
       :show="showFormModal"
       :isEditing="isEditing"
@@ -77,6 +99,15 @@
       @confirm="confirmDelete"
     />
 
+    <!-- Modal Generate Slot Waktu Otomatis -->
+    <TimeSlotGenerateModal 
+      :show="showGenerateModal"
+      :isSaving="timeSlotStore.isSaving"
+      :daysList="daysList"
+      @close="closeGenerateModal"
+      @submit="submitGenerate"
+    />
+
   </SidebarAdmin>
 </template>
 
@@ -87,13 +118,15 @@ import TimeSlotFilter from './components/timeslot/TimeSlotFilter.vue';
 import TimeSlotDayCard from './components/timeslot/TimeSlotDayCard.vue';
 import TimeSlotFormModal from './components/timeslot/TimeSlotFormModal.vue';
 import TimeSlotDeleteModal from './components/timeslot/TimeSlotDeleteModal.vue';
+import TimeSlotGenerateModal from './components/timeslot/TimeSlotGenerateModal.vue';
 import { useTimeSlotStore } from '../../stores/timeSlot';
-import type { TimeSlot, TimeSlotPayload, DayOfWeek } from '../../types/timeSlot';
+import type { TimeSlot, TimeSlotPayload, DayOfWeek, GenerateTimeSlotPayload } from '../../types/timeSlot';
 
 const timeSlotStore = useTimeSlotStore();
 
 const showFormModal = ref(false);
 const showDeleteModal = ref(false);
+const showGenerateModal = ref(false);
 const isEditing = ref(false);
 const isClearDayAction = ref(false);
 const selectedSlot = ref<TimeSlot | null>(null);
@@ -232,6 +265,23 @@ const openEditModal = (slot: TimeSlot) => {
 const closeFormModal = () => {
   if (!timeSlotStore.isSaving) {
     showFormModal.value = false;
+  }
+};
+
+const openGenerateModal = () => {
+  showGenerateModal.value = true;
+};
+
+const closeGenerateModal = () => {
+  if (!timeSlotStore.isSaving) {
+    showGenerateModal.value = false;
+  }
+};
+
+const submitGenerate = async (payload: GenerateTimeSlotPayload) => {
+  const result = await timeSlotStore.generateTimeSlots(payload);
+  if (result.success) {
+    showGenerateModal.value = false;
   }
 };
 

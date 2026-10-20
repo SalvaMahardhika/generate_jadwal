@@ -1,5 +1,5 @@
 import api from './api';
-import type { TimeSlot, TimeSlotPayload, TimeSlotFilter } from '../types/timeSlot';
+import type { TimeSlot, TimeSlotPayload, TimeSlotFilter, GenerateTimeSlotPayload } from '../types/timeSlot';
 import type { ApiResponse } from '../types/auth';
 
 export const TimeSlotService = {
@@ -43,6 +43,14 @@ export const TimeSlotService = {
    */
   async deleteByDay(day: string): Promise<ApiResponse<null>> {
     const response = await api.delete<ApiResponse<null>>(`/time-slots/day/${day}`);
+    return response.data;
+  },
+
+  /**
+   * Mengirim parameter konfigurasi untuk auto-generate slot waktu.
+   */
+  async generate(payload: GenerateTimeSlotPayload): Promise<ApiResponse<TimeSlot[]>> {
+    const response = await api.post<ApiResponse<TimeSlot[]>>('/time-slots/generate', payload);
     return response.data;
   },
 };

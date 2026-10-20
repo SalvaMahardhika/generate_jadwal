@@ -105,4 +105,41 @@ class TimeSlotController extends Controller
             ], $statusCode);
         }
     }
+
+    /**
+     * Otomatis meng-generate seluruh jam pelajaran & istirahat berdasarkan parameter.
+     */
+    public function generate(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'start_time' => 'required|string',
+            'period_duration' => 'required|integer|min:15|max:120',
+            'days' => 'required|array|min:1',
+            'days.*' => 'required|string|in:senin,selasa,rabu,kamis,jumat,sabtu',
+            'periods_per_day' => 'required|array',
+            'breaks' => 'nullable|array',
+            'breaks.*.after_period' => 'required|integer|min:1',
+            'breaks.*.duration' => 'required|integer|min:5|max:120',
+            'breaks.*.label' => 'nullable|string|max:100',
+            'overwrite' => 'nullable|boolean',
+        ]);
+
+        try {
+            $slots = $this->timeSlotService->generate($validated);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Slot waktu berhasil di-generate secara otomatis.',
+                'data' => $slots,
+            ], 201);
+        } catch (Exception $e) {
+            $code = (int) $e->getCode();
+            $statusCode = ($code >= 400 && $code <= 599) ? $code : 500;
+
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage(),
+            ], $statusCode);
+        }
+    }
 }

@@ -90,6 +90,7 @@ Route::prefix('v1')->group(function () {
     Route::prefix('time-slots')->group(function () {
         Route::get('/', [TimeSlotController::class, 'index']);
         Route::post('/', [TimeSlotController::class, 'store']);
+        Route::post('/generate', [TimeSlotController::class, 'generate']); // Rute Auto-Generate
         Route::delete('/day/{day}', [TimeSlotController::class, 'clearByDay']); // Rute Hapus Bulk per Hari
         Route::get('/{timeSlot}', [TimeSlotController::class, 'show']);
         Route::put('/{timeSlot}', [TimeSlotController::class, 'update']);

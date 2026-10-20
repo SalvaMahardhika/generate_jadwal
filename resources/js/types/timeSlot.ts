@@ -25,3 +25,18 @@ export interface TimeSlotFilter {
   day?: string;
   is_break?: string | boolean;
 }
+
+export interface BreakConfig {
+  after_period: number;
+  duration: number;
+  label?: string;
+}
+
+export interface GenerateTimeSlotPayload {
+  start_time: string;
+  period_duration: number;
+  days: DayOfWeek[];
+  periods_per_day: Record<string, number>;
+  breaks: BreakConfig[];
+  overwrite?: boolean;
+}

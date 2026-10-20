@@ -46,9 +46,9 @@
                 </div>
               </div>
 
-              <!-- Waktu Mulai & Waktu Selesai (Format 24 Jam) -->
+              <!-- Waktu Mulai, Durasi (Menit), & Waktu Selesai -->
               <div class="row g-3 mb-3">
-                <div class="col-12 col-sm-6">
+                <div class="col-12 col-sm-4">
                   <label for="start_time" class="form-label fw-medium text-dark small">Waktu Mulai <span class="text-danger">*</span></label>
                   <input 
                     type="text" 
@@ -58,14 +58,31 @@
                     placeholder="07:30"
                     maxlength="5"
                     v-model="form.start_time"
-                    @blur="form.start_time = sanitizeTimeInput(form.start_time)"
+                    @input="onStartTimeChange"
+                    @blur="onStartTimeBlur"
                     required
                   >
-                  <small class="text-muted fs-8">Format 24 jam (misal: 07:30 atau 13:15)</small>
+                  <small class="text-muted fs-8">Format 24 jam</small>
                   <div v-if="errors.start_time" class="invalid-feedback small">{{ errors.start_time[0] }}</div>
                 </div>
 
-                <div class="col-12 col-sm-6">
+                <div class="col-12 col-sm-4">
+                  <label for="duration" class="form-label fw-medium text-dark small">Durasi (Menit) <span class="text-danger">*</span></label>
+                  <input 
+                    type="number" 
+                    id="duration" 
+                    min="1"
+                    max="300"
+                    class="form-control form-control-sm rounded-3 shadow-none"
+                    placeholder="35"
+                    v-model.number="duration"
+                    @input="onDurationChange"
+                    required
+                  >
+                  <small class="text-muted fs-8">Dalam menit</small>
+                </div>
+
+                <div class="col-12 col-sm-4">
                   <label for="end_time" class="form-label fw-medium text-dark small">Waktu Selesai <span class="text-danger">*</span></label>
                   <input 
                     type="text" 
@@ -75,10 +92,11 @@
                     placeholder="08:15"
                     maxlength="5"
                     v-model="form.end_time"
-                    @blur="form.end_time = sanitizeTimeInput(form.end_time)"
+                    @input="onEndTimeChange"
+                    @blur="onEndTimeBlur"
                     required
                   >
-                  <small class="text-muted fs-8">Format 24 jam (misal: 08:15 atau 14:00)</small>
+                  <small class="text-muted fs-8">Format 24 jam</small>
                   <div v-if="errors.end_time" class="invalid-feedback small">{{ errors.end_time[0] }}</div>
                 </div>
               </div>
@@ -140,9 +158,10 @@
 </template>
 
 <script setup lang="ts">
+import { ref, watch } from 'vue';
 import type { TimeSlotPayload, DayOfWeek } from '../../../../types/timeSlot';
 
-defineProps<{
+const props = defineProps<{
   show: boolean;
   isEditing: boolean;
   isSaving: boolean;
@@ -153,9 +172,82 @@ defineProps<{
 
 const emit = defineEmits(['close', 'submit', 'dayChanged']);
 
+const duration = ref<number>(35);
+let isInternalSyncing = false;
+
+const timeToMinutes = (timeStr: string): number => {
+  if (!timeStr) return 0;
+  const clean = timeStr.trim().replace('.', ':');
+  const parts = clean.split(':');
+  if (parts.length < 2) return 0;
+  const h = parseInt(parts[0], 10) || 0;
+  const m = parseInt(parts[1], 10) || 0;
+  return h * 60 + m;
+};
+
+const minutesToTime = (totalMins: number): string => {
+  if (totalMins < 0) totalMins = 0;
+  const h = String(Math.floor(totalMins / 60) % 24).padStart(2, '0');
+  const m = String(totalMins % 60).padStart(2, '0');
+  return `${h}:${m}`;
+};
+
 const sanitizeTimeInput = (val: string) => {
   if (!val) return '';
   return val.trim().replace('.', ':');
+};
+
+const syncDurationFromTimes = () => {
+  const startMins = timeToMinutes(props.form.start_time);
+  const endMins = timeToMinutes(props.form.end_time);
+  if (endMins > startMins) {
+    duration.value = endMins - startMins;
+  }
+};
+
+watch(
+  () => [props.show, props.form.start_time, props.form.end_time],
+  () => {
+    if (isInternalSyncing) return;
+    syncDurationFromTimes();
+  },
+  { immediate: true }
+);
+
+const onDurationChange = () => {
+  if (!duration.value || duration.value <= 0) return;
+  isInternalSyncing = true;
+  const startMins = timeToMinutes(props.form.start_time);
+  props.form.end_time = minutesToTime(startMins + duration.value);
+  setTimeout(() => { isInternalSyncing = false; }, 50);
+};
+
+const onStartTimeChange = () => {
+  isInternalSyncing = true;
+  const cleanStart = sanitizeTimeInput(props.form.start_time);
+  if (cleanStart.length === 5 && duration.value > 0) {
+    const startMins = timeToMinutes(cleanStart);
+    props.form.end_time = minutesToTime(startMins + duration.value);
+  } else {
+    syncDurationFromTimes();
+  }
+  setTimeout(() => { isInternalSyncing = false; }, 50);
+};
+
+const onStartTimeBlur = () => {
+  props.form.start_time = sanitizeTimeInput(props.form.start_time);
+  onStartTimeChange();
+};
+
+const onEndTimeChange = () => {
+  isInternalSyncing = true;
+  syncDurationFromTimes();
+  setTimeout(() => { isInternalSyncing = false; }, 50);
+};
+
+const onEndTimeBlur = () => {
+  props.form.end_time = sanitizeTimeInput(props.form.end_time);
+  onEndTimeChange();
 };
 
 const handleSubmit = () => {
