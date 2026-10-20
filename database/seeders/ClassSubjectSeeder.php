@@ -8,19 +8,25 @@ use App\Models\ClassSubjectTeacher;
 use App\Models\Subject;
 use App\Models\Teacher;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Schema;
 
 class ClassSubjectSeeder extends Seeder
 {
     public function run(): void
     {
+        Schema::disableForeignKeyConstraints();
+        ClassSubjectTeacher::truncate();
+        ClassSubject::truncate();
+        Schema::enableForeignKeyConstraints();
+
         $classes = Classes::with('grade')->get();
         $subjects = Subject::all()->keyBy('subject_code');
         $teachers = Teacher::all();
 
-        // Ambil Guru Spesialis
+        // Ambil Guru Spesialis berdasarkan NIP
         $pabpTeachers  = $teachers->whereIn('nip', ['198609202012011008'])->values(); // PABP & BTQ
         $pjokTeachers  = $teachers->whereIn('nip', ['199104122016011007'])->values(); // PJOK
-        $bingTeachers  = $teachers->whereIn('nip', ['199406142020022009'])->values(); // B. Inggris
+        $bingTeachers  = $teachers->whereIn('nip', ['199406142020022009'])->values(); // B. Inggris / Seni
         $bjawaTeachers = $teachers->whereIn('nip', ['199307222019022010'])->values(); // B. Jawa
         $aiTeachers    = $teachers->whereIn('nip', ['199510102022011011'])->values(); // Koding & AI
 
@@ -71,21 +77,56 @@ class ClassSubjectSeeder extends Seeder
                     'status' => 'active',
                 ]);
 
-                // 2. Tentukan Guru Pengampu
-                $assignedTeacherId = match ($code) {
-                    'PABP', 'BTQ' => $pabpTeachers->first()?->id ?? $class->homeroom_teacher_id,
-                    'PJOK'        => $pjokTeachers->first()?->id ?? $class->homeroom_teacher_id,
-                    'BING'        => $bingTeachers->first()?->id ?? $class->homeroom_teacher_id,
-                    'BJAWA'       => $bjawaTeachers->first()?->id ?? $class->homeroom_teacher_id,
-                    'AI_KODING'   => $aiTeachers->first()?->id ?? $class->homeroom_teacher_id,
-                    default       => $class->homeroom_teacher_id ?? $teachers->first()->id,
-                };
+                // 2. Tentukan Alokasi Guru Pengampu & Skenario Team Teaching
+                $homeroomTeacherId = $class->homeroom_teacher_id ?? $teachers->first()->id;
 
-                // 3. Buat data ClassSubjectTeacher
-                ClassSubjectTeacher::create([
-                    'class_subject_id' => $classSubject->id,
-                    'teacher_id' => $assignedTeacherId,
-                ]);
+                if ($code === 'KOKURIKULER') {
+                    // Skenario Team Teaching 1: Kokurikuler (5 JP) -> Wali Kelas (3 JP) + Guru Seni/Inggris (2 JP)
+                    $assistantTeacherId = $bingTeachers->first()?->id ?? $teachers->last()->id;
+
+                    ClassSubjectTeacher::create([
+                        'class_subject_id' => $classSubject->id,
+                        'teacher_id' => $homeroomTeacherId,
+                        'jp' => 3,
+                    ]);
+
+                    ClassSubjectTeacher::create([
+                        'class_subject_id' => $classSubject->id,
+                        'teacher_id' => $assistantTeacherId,
+                        'jp' => 2,
+                    ]);
+                } elseif ($code === 'BINDO' && $sequence >= 3) {
+                    // Skenario Team Teaching 2: Bahasa Indonesia Kelas Tinggi (6 JP) -> Wali Kelas (4 JP) + Guru B. Jawa (2 JP)
+                    $assistantTeacherId = $bjawaTeachers->first()?->id ?? $teachers->last()->id;
+
+                    ClassSubjectTeacher::create([
+                        'class_subject_id' => $classSubject->id,
+                        'teacher_id' => $homeroomTeacherId,
+                        'jp' => 4,
+                    ]);
+
+                    ClassSubjectTeacher::create([
+                        'class_subject_id' => $classSubject->id,
+                        'teacher_id' => $assistantTeacherId,
+                        'jp' => 2,
+                    ]);
+                } else {
+                    // Single Teacher (Guru Tunggal) -> Mengajar seluruh total_jp mapel
+                    $assignedTeacherId = match ($code) {
+                        'PABP', 'BTQ' => $pabpTeachers->first()?->id ?? $homeroomTeacherId,
+                        'PJOK'        => $pjokTeachers->first()?->id ?? $homeroomTeacherId,
+                        'BING'        => $bingTeachers->first()?->id ?? $homeroomTeacherId,
+                        'BJAWA'       => $bjawaTeachers->first()?->id ?? $homeroomTeacherId,
+                        'AI_KODING'   => $aiTeachers->first()?->id ?? $homeroomTeacherId,
+                        default       => $homeroomTeacherId,
+                    };
+
+                    ClassSubjectTeacher::create([
+                        'class_subject_id' => $classSubject->id,
+                        'teacher_id' => $assignedTeacherId,
+                        'jp' => $totalJp,
+                    ]);
+                }
             }
         }
     }

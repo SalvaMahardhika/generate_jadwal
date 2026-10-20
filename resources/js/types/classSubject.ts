@@ -6,7 +6,13 @@ export interface ClassSubjectTeacher {
   id: number;
   class_subject_id: number;
   teacher_id: number;
+  jp: number;
   teacher?: TeacherOption;
+}
+
+export interface TeacherAssignmentInput {
+  teacher_id: number;
+  jp: number;
 }
 
 export interface ClassSubject {
@@ -31,11 +37,11 @@ export interface AssignClassSubjectPayload {
   subject_id: number | string;
   total_jp: number | string;
   max_jp_per_day: number | string;
-  teacher_ids: number[];
+  teachers: TeacherAssignmentInput[];
 }
 
 export interface UpdateClassSubjectPayload {
   total_jp: number | string;
   max_jp_per_day: number | string;
-  teacher_ids: number[];
+  teachers: TeacherAssignmentInput[];
 }

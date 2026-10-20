@@ -12,40 +12,45 @@ class TimeSlotSeeder extends Seeder
     {
         $days = ['senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu'];
 
-        // Jam belajar Senin - Kamis (Sesuai Permendikdasmen No 13 Tahun 2025)
+        // Jam belajar Senin - Kamis (11 Slot)
         $weekdaySlots = [
-            ['period' => 1, 'start' => '07:00', 'end' => '07:35', 'is_break' => false, 'label' => 'JP 1 (Upacara / Litnum)'],
+            ['period' => 1,  'start' => '07:00', 'end' => '07:35', 'is_break' => false, 'label' => 'JP 1'],
+            ['period' => 2,  'start' => '07:35', 'end' => '08:10', 'is_break' => false, 'label' => 'JP 2'],
+            ['period' => 3,  'start' => '08:10', 'end' => '08:45', 'is_break' => false, 'label' => 'JP 3'],
+            ['period' => 4,  'start' => '08:45', 'end' => '09:20', 'is_break' => false, 'label' => 'JP 4'],
+            ['period' => 5,  'start' => '09:20', 'end' => '09:35', 'is_break' => true,  'label' => 'Istirahat I'],
+            ['period' => 6,  'start' => '09:35', 'end' => '10:10', 'is_break' => false, 'label' => 'JP 5'],
+            ['period' => 7,  'start' => '10:10', 'end' => '10:45', 'is_break' => false, 'label' => 'JP 6'],
+            ['period' => 8,  'start' => '10:45', 'end' => '11:00', 'is_break' => true,  'label' => 'ISHOMA'],
+            ['period' => 9,  'start' => '11:00', 'end' => '11:35', 'is_break' => false, 'label' => 'JP 7'],
+            ['period' => 10, 'start' => '11:35', 'end' => '12:10', 'is_break' => false, 'label' => 'JP 8'],
+            ['period' => 11, 'start' => '12:10', 'end' => '12:45', 'is_break' => false, 'label' => 'JP 9'],
+        ];
+
+        // Jam belajar Jumat (8 Slot)
+        $fridaySlots = [
+            ['period' => 1, 'start' => '07:00', 'end' => '07:35', 'is_break' => false, 'label' => 'JP 1'],
             ['period' => 2, 'start' => '07:35', 'end' => '08:10', 'is_break' => false, 'label' => 'JP 2'],
             ['period' => 3, 'start' => '08:10', 'end' => '08:45', 'is_break' => false, 'label' => 'JP 3'],
             ['period' => 4, 'start' => '08:45', 'end' => '09:20', 'is_break' => false, 'label' => 'JP 4'],
             ['period' => 5, 'start' => '09:20', 'end' => '09:35', 'is_break' => true,  'label' => 'Istirahat I'],
             ['period' => 6, 'start' => '09:35', 'end' => '10:10', 'is_break' => false, 'label' => 'JP 5'],
             ['period' => 7, 'start' => '10:10', 'end' => '10:45', 'is_break' => false, 'label' => 'JP 6'],
-            ['period' => 8, 'start' => '10:45', 'end' => '11:00', 'is_break' => true,  'label' => 'Istirahat II'],
-            ['period' => 9, 'start' => '11:00', 'end' => '11:35', 'is_break' => false, 'label' => 'JP 7'],
-            ['period' => 10,'start' => '11:35', 'end' => '12:10', 'is_break' => false, 'label' => 'JP 8'],
+            ['period' => 8, 'start' => '10:45', 'end' => '11:00', 'is_break' => true,  'label' => 'ISHOMA'],
         ];
 
-        // Jam belajar Jumat (Pendek)
-        $fridaySlots = [
-            ['period' => 1, 'start' => '07:00', 'end' => '07:35', 'is_break' => false, 'label' => 'JP 1 (Litnum)'],
-            ['period' => 2, 'start' => '07:35', 'end' => '08:10', 'is_break' => false, 'label' => 'JP 2'],
-            ['period' => 3, 'start' => '08:10', 'end' => '08:45', 'is_break' => false, 'label' => 'JP 3'],
-            ['period' => 4, 'start' => '08:45', 'end' => '09:20', 'is_break' => false, 'label' => 'JP 4'],
-            ['period' => 5, 'start' => '09:20', 'end' => '09:35', 'is_break' => true,  'label' => 'Istirahat'],
-            ['period' => 6, 'start' => '09:35', 'end' => '10:10', 'is_break' => false, 'label' => 'JP 5'],
-            ['period' => 7, 'start' => '10:10', 'end' => '10:45', 'is_break' => false, 'label' => 'JP 6'],
-        ];
-
-        // Jam belajar Sabtu (Khusus Litnum + Kokurikuler / P5)
+        // Jam belajar Sabtu (10 Slot)
         $saturdaySlots = [
-            ['period' => 1, 'start' => '07:00', 'end' => '07:35', 'is_break' => false, 'label' => 'JP 1 (Litnum)'],
-            ['period' => 2, 'start' => '07:35', 'end' => '08:10', 'is_break' => false, 'label' => 'Kokurikuler 1'],
-            ['period' => 3, 'start' => '08:10', 'end' => '08:45', 'is_break' => false, 'label' => 'Kokurikuler 2'],
-            ['period' => 4, 'start' => '08:45', 'end' => '09:20', 'is_break' => false, 'label' => 'Kokurikuler 3'],
-            ['period' => 5, 'start' => '09:20', 'end' => '09:35', 'is_break' => true,  'label' => 'Istirahat'],
-            ['period' => 6, 'start' => '09:35', 'end' => '10:10', 'is_break' => false, 'label' => 'Kokurikuler 4'],
-            ['period' => 7, 'start' => '10:10', 'end' => '10:45', 'is_break' => false, 'label' => 'Kokurikuler 5'],
+            ['period' => 1,  'start' => '07:00', 'end' => '07:35', 'is_break' => false, 'label' => 'JP 1'],
+            ['period' => 2,  'start' => '07:35', 'end' => '08:10', 'is_break' => false, 'label' => 'JP 2'],
+            ['period' => 3,  'start' => '08:10', 'end' => '08:45', 'is_break' => false, 'label' => 'JP 3'],
+            ['period' => 4,  'start' => '08:45', 'end' => '09:20', 'is_break' => false, 'label' => 'JP 4'],
+            ['period' => 5,  'start' => '09:20', 'end' => '09:35', 'is_break' => true,  'label' => 'Istirahat I'],
+            ['period' => 6,  'start' => '09:35', 'end' => '10:10', 'is_break' => false, 'label' => 'JP 5'],
+            ['period' => 7,  'start' => '10:10', 'end' => '10:45', 'is_break' => false, 'label' => 'JP 6'],
+            ['period' => 8,  'start' => '10:45', 'end' => '11:00', 'is_break' => true,  'label' => 'ISHOMA'],
+            ['period' => 9,  'start' => '11:00', 'end' => '11:35', 'is_break' => false, 'label' => 'JP 7'],
+            ['period' => 10, 'start' => '11:35', 'end' => '12:10', 'is_break' => false, 'label' => 'JP 8'],
         ];
 
         Schema::disableForeignKeyConstraints();

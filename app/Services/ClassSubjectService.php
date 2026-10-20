@@ -40,10 +40,11 @@ class ClassSubjectService
                 'status' => 'active',
             ]);
 
-            foreach ($data['teacher_ids'] as $teacherId) {
+            foreach ($data['teachers'] as $teacherData) {
                 ClassSubjectTeacher::create([
                     'class_subject_id' => $classSubject->id,
-                    'teacher_id' => $teacherId,
+                    'teacher_id' => $teacherData['teacher_id'],
+                    'jp' => $teacherData['jp'],
                 ]);
             }
 
@@ -59,13 +60,14 @@ class ClassSubjectService
                 'max_jp_per_day' => $data['max_jp_per_day'],
             ]);
 
-            // Sync guru pengampu
+            // Sync guru pengampu beserta alokasi JP
             $classSubject->classSubjectTeachers()->delete();
 
-            foreach ($data['teacher_ids'] as $teacherId) {
+            foreach ($data['teachers'] as $teacherData) {
                 ClassSubjectTeacher::create([
                     'class_subject_id' => $classSubject->id,
-                    'teacher_id' => $teacherId,
+                    'teacher_id' => $teacherData['teacher_id'],
+                    'jp' => $teacherData['jp'],
                 ]);
             }
 

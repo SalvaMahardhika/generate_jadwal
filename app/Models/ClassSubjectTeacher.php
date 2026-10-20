@@ -12,6 +12,7 @@ class ClassSubjectTeacher extends Model
     protected $fillable = [
         'class_subject_id',
         'teacher_id',
+        'jp',
     ];
 
     public function classSubject()
