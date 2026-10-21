@@ -122,6 +122,9 @@ const showModal = ref(false);
 const activeSlot = ref<TimeSlot | null>(null);
 const activeSchedule = ref<ScheduleItem | null>(null);
 
+// Flag untuk mencegah watcher terpicu berulang kali saat inisialisasi awal
+const isInitializing = ref(true);
+
 const availableClassSubjects = computed(() => classSubjectsMap.value);
 
 const updateDefaultMaxPeriod = (selectedClass?: ClassItem) => {
@@ -141,23 +144,29 @@ const fetchDropdowns = async () => {
     ]);
 
     if (ayRes.data?.status === 'success') {
-      academicYearsList.value = ayRes.data.data;
-      const activeAy = academicYearsList.value.find(a => a.is_active);
-      if (activeAy) wizardStore.selectedAcademicYearId = activeAy.id;
-      else if (academicYearsList.value.length > 0) wizardStore.selectedAcademicYearId = academicYearsList.value[0].id;
+      academicYearsList.value = ayRes.data.data || [];
+      if (!wizardStore.selectedAcademicYearId) {
+        const activeAy = academicYearsList.value.find(a => a.is_active);
+        if (activeAy) {
+          wizardStore.selectedAcademicYearId = activeAy.id;
+        } else if (academicYearsList.value.length > 0) {
+          wizardStore.selectedAcademicYearId = academicYearsList.value[0].id;
+        }
+      }
     }
 
     if (clsRes.data?.status === 'success') {
-      classesList.value = clsRes.data.data;
-      if (classesList.value.length > 0) {
+      classesList.value = clsRes.data.data || [];
+      if (classesList.value.length > 0 && !wizardStore.selectedClassId) {
         wizardStore.selectedClassId = classesList.value[0].id;
-        updateDefaultMaxPeriod(classesList.value[0]);
       }
     }
 
     if (tchrRes.data?.status === 'success') {
-      teachersList.value = tchrRes.data.data;
-      if (teachersList.value.length > 0) wizardStore.selectedTeacherId = teachersList.value[0].id;
+      teachersList.value = tchrRes.data.data || [];
+      if (teachersList.value.length > 0 && !wizardStore.selectedTeacherId) {
+        wizardStore.selectedTeacherId = teachersList.value[0].id;
+      }
     }
   } catch (err) {
     console.error('Gagal memuat opsi dropdown:', err);
@@ -177,6 +186,7 @@ const fetchClassSubjects = async (classId: number) => {
               id: cst.id,
               class_subject_id: cs.id,
               teacher_id: cst.teacher_id,
+              jp: cst.jp, // PERBAIKAN: Sertakan jatah JP spesifik individu guru
               class_subject: cs,
               teacher: cst.teacher
             });
@@ -190,28 +200,52 @@ const fetchClassSubjects = async (classId: number) => {
   }
 };
 
-watch(() => wizardStore.viewMode, () => wizardStore.refreshCurrentView());
-watch(() => wizardStore.selectedAcademicYearId, () => wizardStore.refreshCurrentView());
-watch(() => wizardStore.selectedClassId, (newId) => {
-  if (newId) {
-    const cls = classesList.value.find(c => c.id === newId);
-    updateDefaultMaxPeriod(cls);
-    fetchClassSubjects(newId);
-    if (wizardStore.viewMode === 'class') wizardStore.fetchClassMatrix(newId);
-  }
-});
-watch(() => wizardStore.selectedTeacherId, (newId) => {
-  if (newId && wizardStore.viewMode === 'teacher') wizardStore.fetchTeacherMatrix(newId);
-});
-
-onMounted(async () => {
-  await fetchDropdowns();
-  if (wizardStore.selectedClassId) {
-    fetchClassSubjects(wizardStore.selectedClassId);
-  }
+// WATCHERS (Hanya berjalan setelah proses inisialisasi selesai)
+watch(() => wizardStore.viewMode, () => {
+  if (isInitializing.value) return;
   wizardStore.refreshCurrentView();
 });
 
+watch(() => wizardStore.selectedAcademicYearId, () => {
+  if (isInitializing.value) return;
+  wizardStore.refreshCurrentView();
+});
+
+watch(() => wizardStore.selectedClassId, async (newId) => {
+  if (isInitializing.value || !newId) return;
+  const cls = classesList.value.find(c => c.id === newId);
+  updateDefaultMaxPeriod(cls);
+  await fetchClassSubjects(newId);
+  if (wizardStore.viewMode === 'class') {
+    wizardStore.fetchClassMatrix(newId);
+  }
+});
+
+watch(() => wizardStore.selectedTeacherId, (newId) => {
+  if (isInitializing.value || !newId) return;
+  if (wizardStore.viewMode === 'teacher') {
+    wizardStore.fetchTeacherMatrix(newId);
+  }
+});
+
+// LIFECYCLE INITIALIZATION
+onMounted(async () => {
+  isInitializing.value = true;
+  
+  await fetchDropdowns();
+  
+  if (wizardStore.selectedClassId) {
+    const cls = classesList.value.find(c => c.id === wizardStore.selectedClassId);
+    updateDefaultMaxPeriod(cls);
+    await fetchClassSubjects(wizardStore.selectedClassId);
+  }
+
+  await wizardStore.refreshCurrentView();
+  
+  isInitializing.value = false;
+});
+
+// MODAL & HANDLERS
 const openAssignModal = (payload: { slot: TimeSlot; schedule: ScheduleItem | null }) => {
   activeSlot.value = payload.slot;
   activeSchedule.value = payload.schedule;

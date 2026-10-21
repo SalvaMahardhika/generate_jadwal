@@ -59,11 +59,14 @@
                 >
                   <option :value="null">-- Pilih Mata Pelajaran --</option>
                   <option 
-                    v-for="cst in availableSubjects" 
+                    v-for="cst in availableSubjectsWithQuota" 
                     :key="cst.id" 
                     :value="cst.id"
+                    :disabled="cst.isFull && cst.id !== currentSchedule?.class_subject_teacher_id"
                   >
-                    {{ cst.class_subject?.subject?.subject_name ?? '-' }} - {{ cst.teacher?.name ?? '-' }}
+                    {{ cst.subjectName }} - {{ cst.teacherName }} 
+                    ({{ cst.assignedJp }}/{{ cst.maxJp }} JP) 
+                    <template v-if="cst.isFull && cst.id !== currentSchedule?.class_subject_teacher_id">[PENUH]</template>
                   </option>
                 </select>
               </div>
@@ -185,8 +188,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch } from 'vue';
+import { ref, reactive, watch, computed } from 'vue';
+import { useWizardStore } from '../../../../stores/wizard';
 import type { TimeSlot, ScheduleItem, ClassSubjectTeacherDetail } from '../../../../types/wizard';
+
+const wizardStore = useWizardStore();
 
 const props = defineProps<{
   show: boolean;
@@ -206,6 +212,40 @@ const form = reactive({
   custom_activity: '',
   is_locked: false,
   apply_to_all_classes: false,
+});
+
+// Kalkulasi kuota terpakai & batas maksimal per guru di UI secara presisi
+const availableSubjectsWithQuota = computed(() => {
+  const currentSchedules = wizardStore.classMatrix?.schedules || {};
+  const allScheduleValues = Object.values(currentSchedules);
+
+  return props.availableSubjects.map((cst) => {
+    // Utamakan jatah JP individu guru (cst.jp). Jika bernilai null/undefined/0, baru fallback ke total_jp mapel.
+    const maxJp = (cst.jp !== undefined && cst.jp !== null && Number(cst.jp) > 0)
+      ? Number(cst.jp)
+      : (cst.class_subject?.total_jp || 0);
+
+    // 1. Total slot terpasang untuk guru ini di seluruh matriks jadwal kelas aktif (untuk tampilan label)
+    const totalAssignedJp = allScheduleValues.filter(
+      (sched) => sched.class_subject_teacher_id === cst.id
+    ).length;
+
+    // 2. Total slot terpasang DI LUAR slot aktif yang sedang dibuka (untuk pengecekan kuota penuh)
+    const otherSlotsCount = allScheduleValues.filter(
+      (sched) => sched.class_subject_teacher_id === cst.id && sched.time_slot_id !== props.timeSlot?.id
+    ).length;
+
+    const isFull = otherSlotsCount >= maxJp;
+
+    return {
+      ...cst,
+      subjectName: cst.class_subject?.subject?.subject_name ?? '-',
+      teacherName: cst.teacher?.name ?? '-',
+      assignedJp: totalAssignedJp,
+      maxJp,
+      isFull,
+    };
+  });
 });
 
 const switchSlotType = (type: 'subject' | 'routine') => {

@@ -17,6 +17,7 @@ export interface ClassSubjectTeacherDetail {
   id: number;
   class_subject_id: number;
   teacher_id: number;
+  jp?: number; // Jatah alokasi JP spesifik individu guru
   class_subject?: {
     id: number;
     class_id: number;

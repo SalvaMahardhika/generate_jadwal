@@ -15,20 +15,25 @@ use Illuminate\Support\Facades\DB;
 class ScheduleGeneratorService
 {
     /**
-     * Memeriksa apakah guru mengalami bentrok jadwal di kelas lain pada slot waktu yang sama.
+     * Memeriksa apakah guru (atau salah satu guru dalam team teaching) mengalami bentrok jadwal
+     * di kelas lain pada slot waktu yang sama.
+     *
+     * @param int|array $teacherIds Single ID atau Array ID guru
      */
     public function checkTeacherConflict(
-        int $teacherId,
+        int|array $teacherIds,
         int $timeSlotId,
         int $academicYearId,
         ?int $excludeScheduleId = null
     ): bool {
+        $ids = is_array($teacherIds) ? $teacherIds : [$teacherIds];
+
         return Schedule::query()
             ->where('academic_year_id', $academicYearId)
             ->where('time_slot_id', $timeSlotId)
             ->when($excludeScheduleId, fn($q) => $q->where('id', '!=', $excludeScheduleId))
-            ->whereHas('classSubjectTeacher', function ($q) use ($teacherId) {
-                $q->where('teacher_id', $teacherId);
+            ->whereHas('classSubjectTeacher', function ($q) use ($ids) {
+                $q->whereIn('teacher_id', $ids);
             })
             ->exists();
     }
@@ -88,6 +93,7 @@ class ScheduleGeneratorService
             'class.grade',
             'class.major',
             'classSubjectTeacher.classSubject.subject',
+            'classSubjectTeacher.teacher',
             'timeSlot',
         ])
         ->where('academic_year_id', $academicYearId)
@@ -134,7 +140,7 @@ class ScheduleGeneratorService
     }
 
     /**
-     * Eksekusi Algoritma Auto-Generate Jadwal Berbasis Blok Berurutan (Block Periods).
+     * Eksekusi Algoritma Auto-Generate Jadwal Berbasis Blok Berurutan & Tersentralisasi
      */
     public function generate(int $academicYearId, ?int $classId = null, int $userId = 1, ?int $maxPeriodNumber = null): array
     {
@@ -152,14 +158,14 @@ class ScheduleGeneratorService
                 throw new Exception('Tidak ada kelas aktif yang ditemukan untuk di-generate.', 404);
             }
 
-            // Hitung statistik berapa banyak kelas yang diampu setiap guru (identifikasi guru spesialis lintas kelas)
+            // Hitung beban statistik mengajar guru di lintas kelas
             $teacherClassCounts = DB::table('class_subject_teachers')
                 ->join('class_subjects', 'class_subjects.id', '=', 'class_subject_teachers.class_subject_id')
                 ->select('class_subject_teachers.teacher_id', DB::raw('COUNT(DISTINCT class_subjects.class_id) as class_count'))
                 ->groupBy('class_subject_teachers.teacher_id')
                 ->pluck('class_count', 'teacher_id');
 
-            // Ambil seluruh slot waktu non-istirahat, diurutkan berdasarkan Hari lalu Jam ke-
+            // Ambil seluruh slot waktu pembelajaran (non-istirahat)
             $allTimeSlots = TimeSlot::where('is_break', false)
                 ->orderByRaw("FIELD(day, 'senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu')")
                 ->orderBy('period_number', 'asc')
@@ -182,7 +188,7 @@ class ScheduleGeneratorService
                     default => 11,
                 };
 
-                // Filter slot waktu khusus kelas ini dan kelompokkan per hari
+                // Slot waktu khusus untuk jenjang kelas ini
                 $classTimeSlots = $allTimeSlots->filter(fn($slot) => $slot->period_number <= $limitPeriod);
                 $slotsByDay = $classTimeSlots->groupBy('day');
 
@@ -196,7 +202,7 @@ class ScheduleGeneratorService
                     ->where('status', 'active')
                     ->get();
 
-                // Catat penggunaan harian per mapel
+                // Catat alokasi harian per mapel/guru
                 $dailySubjectUsage = [];
                 foreach ($lockedSchedules as $slotId => $sched) {
                     if ($sched->classSubjectTeacher) {
@@ -208,46 +214,49 @@ class ScheduleGeneratorService
                     }
                 }
 
-                // Bentuk Paket Blok JP (Block Pool)
+                // Bentuk Paket Blok JP (Block Pool) mendukung Team Teaching & Kuota Individu Guru
                 $blockPool = [];
 
                 foreach ($classSubjects as $cs) {
-                    $cst = $cs->classSubjectTeachers->first();
-                    if (!$cst) {
-                        continue;
-                    }
-
-                    $alreadyPlacedCount = $lockedSchedules->filter(function ($sched) use ($cs) {
-                        return $sched->classSubjectTeacher && $sched->classSubjectTeacher->class_subject_id == $cs->id;
-                    })->count();
-
-                    $remainingToPlace = $cs->total_jp - $alreadyPlacedCount;
-                    if ($remainingToPlace <= 0) {
+                    if ($cs->classSubjectTeachers->isEmpty()) {
                         continue;
                     }
 
                     $maxJpPerDay = max(1, $cs->max_jp_per_day);
-                    $teacherId = $cst->teacher_id;
-                    $isSpecialist = ($teacherClassCounts->get($teacherId, 1) > 1);
 
-                    // Pecah total JP sisa menjadi blok berurutan (misal: 2 JP + 2 JP + 1 JP)
-                    while ($remainingToPlace > 0) {
-                        $blockSize = min($remainingToPlace, $maxJpPerDay);
-                        $blockPool[] = [
-                            'class_subject_id' => $cs->id,
-                            'class_subject_teacher_id' => $cst->id,
-                            'teacher_id' => $teacherId,
-                            'max_jp_per_day' => $cs->max_jp_per_day,
-                            'size' => $blockSize,
-                            'is_specialist' => $isSpecialist,
-                        ];
-                        $remainingToPlace -= $blockSize;
+                    // Proses setiap guru pengampu berdasarkan alokasi JP individunya
+                    foreach ($cs->classSubjectTeachers as $cst) {
+                        $targetJpForThisTeacher = $cst->jp > 0 ? $cst->jp : $cs->total_jp;
+
+                        $alreadyPlacedCount = $lockedSchedules->filter(function ($sched) use ($cst) {
+                            return $sched->class_subject_teacher_id == $cst->id;
+                        })->count();
+
+                        $remainingToPlace = $targetJpForThisTeacher - $alreadyPlacedCount;
+                        if ($remainingToPlace <= 0) {
+                            continue;
+                        }
+
+                        $teacherId = $cst->teacher_id;
+                        $isSpecialist = ($teacherClassCounts->get($teacherId, 1) > 1);
+
+                        // Pecah sisa JP guru menjadi blok berurutan
+                        while ($remainingToPlace > 0) {
+                            $blockSize = min($remainingToPlace, $maxJpPerDay);
+                            $blockPool[] = [
+                                'class_subject_id' => $cs->id,
+                                'class_subject_teacher_id' => $cst->id,
+                                'teacher_id' => $teacherId,
+                                'max_jp_per_day' => $maxJpPerDay,
+                                'size' => $blockSize,
+                                'is_specialist' => $isSpecialist,
+                            ];
+                            $remainingToPlace -= $blockSize;
+                        }
                     }
                 }
 
-                // Urutkan Blok Prioritas:
-                // 1. Guru Spesialis Lintas Kelas lebih dulu
-                // 2. Ukuran Blok Lebih Besar (2 JP) lebih dulu dibanding 1 JP
+                // Pengurutan Prioritas Penempatan Blok
                 usort($blockPool, function ($a, $b) {
                     if ($a['is_specialist'] !== $b['is_specialist']) {
                         return $b['is_specialist'] <=> $a['is_specialist'];
@@ -255,7 +264,7 @@ class ScheduleGeneratorService
                     if ($a['size'] !== $b['size']) {
                         return $b['size'] <=> $a['size'];
                     }
-                    return rand(-1, 1);
+                    return 0;
                 });
 
                 // Tempatkan Masing-Masing Blok ke Slot Berurutan
@@ -270,7 +279,6 @@ class ScheduleGeneratorService
                         $userId
                     );
 
-                    // Jika blok ukuran 2 JP gagal ditempatkanutuh, coba pecah menjadi 1 JP terpisah
                     if (!$placed && $block['size'] > 1) {
                         for ($s = 0; $s < $block['size']; $s++) {
                             $singleBlock = $block;
@@ -330,7 +338,6 @@ class ScheduleGeneratorService
 
         $days = $slotsByDay->keys()->toArray();
 
-        // Urutkan hari berdasarkan hari yang penggunaan mapel ini paling sedikit (distribusi merata per hari)
         usort($days, function ($dayA, $dayB) use ($dailySubjectUsage, $csId) {
             $usageA = $dailySubjectUsage[$dayA][$csId] ?? 0;
             $usageB = $dailySubjectUsage[$dayB][$csId] ?? 0;
@@ -350,7 +357,6 @@ class ScheduleGeneratorService
                 continue;
             }
 
-            // Cari kandidat $blockSize slot berurutan dalam hari ini
             for ($i = 0; $i <= $slotCount - $blockSize; $i++) {
                 $candidateSlots = [];
                 $canPlace = true;
@@ -358,13 +364,11 @@ class ScheduleGeneratorService
                 for ($k = 0; $k < $blockSize; $k++) {
                     $slot = $daySlots->get($i + $k);
 
-                    // 1. Cek apakah slot sudah terisi di kelas ini
                     if ($lockedSchedules->has($slot->id)) {
                         $canPlace = false;
                         break;
                     }
 
-                    // 2. Cek apakah guru sedang mengajar di kelas lain pada slot ini
                     if ($this->checkTeacherConflict($teacherId, $slot->id, $academicYearId)) {
                         $canPlace = false;
                         break;
@@ -374,7 +378,6 @@ class ScheduleGeneratorService
                 }
 
                 if ($canPlace) {
-                    // Simpan seluruh slot dalam blok sekaligus
                     foreach ($candidateSlots as $slot) {
                         Schedule::create([
                             'academic_year_id' => $academicYearId,
@@ -421,7 +424,8 @@ class ScheduleGeneratorService
     }
 
     /**
-     * Penempatan / penggeseran jadwal secara manual dengan pengetatan validasi bentrok guru.
+     * Penempatan / penggeseran jadwal secara manual dengan pengetatan validasi bentrok guru
+     * DAN validasi batas kuota JP individu guru.
      */
     public function manualAssign(array $data, int $userId): ?Schedule
     {
@@ -449,16 +453,44 @@ class ScheduleGeneratorService
         }
 
         if (!empty($data['class_subject_teacher_id'])) {
-            $cst = ClassSubjectTeacher::findOrFail($data['class_subject_teacher_id']);
+            $cst = ClassSubjectTeacher::with(['teacher', 'classSubject.subject'])->findOrFail($data['class_subject_teacher_id']);
 
-            $hasConflict = $this->checkTeacherConflict(
-                $cst->teacher_id,
-                $data['time_slot_id'],
-                $data['academic_year_id']
-            );
+            foreach ($targetClassIds as $targetClassId) {
+                // 1. Validasi Bentrok Jam Mengajar Guru di Kelas Lain
+                $existingSchedule = Schedule::where('academic_year_id', $data['academic_year_id'])
+                    ->where('class_id', $targetClassId)
+                    ->where('time_slot_id', $data['time_slot_id'])
+                    ->first();
 
-            if ($hasConflict) {
-                throw new Exception('Gagal assign manual: Guru pengampu sedang mengajar di kelas lain pada slot waktu ini.', 422);
+                $excludeId = $existingSchedule?->id;
+
+                $hasConflict = $this->checkTeacherConflict(
+                    $cst->teacher_id,
+                    $data['time_slot_id'],
+                    $data['academic_year_id'],
+                    $excludeId
+                );
+
+                if ($hasConflict) {
+                    $teacherName = $cst->teacher?->name ?? 'Guru';
+                    throw new Exception("Gagal assign manual: {$teacherName} sedang mengajar di kelas lain pada slot waktu ini.", 422);
+                }
+
+                // 2. Validasi Batas Kuota JP Guru Individu
+                $maxTeacherJp = $cst->jp > 0 ? $cst->jp : ($cst->classSubject?->total_jp ?? 0);
+
+                // Hitung berapa JP yang SUDAH teralokasi untuk guru ini di kelas dan mapel ini
+                $currentAssignedCount = Schedule::where('academic_year_id', $data['academic_year_id'])
+                    ->where('class_id', $targetClassId)
+                    ->where('class_subject_teacher_id', $cst->id)
+                    ->when($excludeId, fn($q) => $q->where('id', '!=', $excludeId))
+                    ->count();
+
+                if ($currentAssignedCount >= $maxTeacherJp) {
+                    $teacherName = $cst->teacher?->name ?? 'Guru';
+                    $subjectName = $cst->classSubject?->subject?->subject_name ?? 'Mata Pelajaran';
+                    throw new Exception("Gagal assign manual: {$teacherName} sudah mencapai batas maksimal alokasi mengajar untuk {$subjectName} ({$maxTeacherJp} JP).", 422);
+                }
             }
         }
 
@@ -494,7 +526,7 @@ class ScheduleGeneratorService
     }
 
     /**
-     * Mengosongkan sel/slot spesifik (mendukung opsi hapus di semua kelas dan mengabaikan kuncian saat dihapus manual oleh admin).
+     * Mengosongkan sel/slot spesifik.
      */
     public function clearSlot(int $academicYearId, int $classId, int $timeSlotId, bool $clearAllClasses = false): bool
     {

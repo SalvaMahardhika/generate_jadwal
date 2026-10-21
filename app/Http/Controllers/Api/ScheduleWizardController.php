@@ -46,7 +46,13 @@ class ScheduleWizardController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => [
-                'class' => $class->load(['grade', 'major', 'academicYear']),
+                'class' => $class->load([
+                    'grade',
+                    'major',
+                    'academicYear',
+                    'classSubjects.subject',
+                    'classSubjects.classSubjectTeachers.teacher',
+                ]),
                 'time_slots' => $timeSlots,
                 'schedules' => $schedules,
                 'balance' => $balance,
@@ -168,7 +174,7 @@ class ScheduleWizardController extends Controller
     }
 
     /**
-     * Menempatkan/mengubah mapel secara manual.
+     * Menempatkan/mengubah mapel secara manual dengan penanganan error bentrok.
      */
     public function manualAssign(ManualAssignScheduleRequest $request): JsonResponse
     {
@@ -183,7 +189,7 @@ class ScheduleWizardController extends Controller
             ]);
         } catch (Exception $e) {
             $code = (int) $e->getCode();
-            $statusCode = ($code >= 400 && $code <= 599) ? $code : 500;
+            $statusCode = ($code >= 400 && $code <= 599) ? $code : 422;
 
             return response()->json([
                 'status' => 'error',
