@@ -30,7 +30,7 @@
         </button>
       </div>
 
-      <!-- FILTER DROPDOWNS & INPUT MAKS JP -->
+      <!-- FILTER DROPDOWNS -->
       <div class="d-flex flex-wrap align-items-center gap-2">
         <!-- Filter Tahun Ajaran -->
         <select 
@@ -71,20 +71,6 @@
             {{ teacher.name }}
           </option>
         </select>
-
-        <!-- Input Pilihan Maksimal JP / Hari (Diperbaiki UI-nya agar tidak bentrok) -->
-        <div class="d-flex align-items-center bg-light border rounded-3 px-2.5 py-1 gap-2 ms-1" title="Batas Maksimal Jam Pelajaran Per Hari">
-          <i class="bi bi-clock-history text-muted fs-8"></i>
-          <span class="fs-8 text-secondary fw-medium">Maks JP:</span>
-          <select 
-            class="form-select form-select-sm border bg-white rounded-2 px-2 py-0 shadow-none fw-bold text-primary cursor-pointer" 
-            style="width: 72px; font-size: 0.82rem;"
-            :value="maxPeriodNumber"
-            @change="emit('update:maxPeriodNumber', Number(($event.target as HTMLSelectElement).value))"
-          >
-            <option v-for="n in 11" :key="n" :value="n">JP {{ n }}</option>
-          </select>
-        </div>
       </div>
 
       <!-- KONTROL AKSI UTAMA -->
@@ -137,7 +123,6 @@ defineProps<{
   selectedAcademicYearId: number | null;
   selectedClassId: number | null;
   selectedTeacherId: number | null;
-  maxPeriodNumber: number;
   isProcessing: boolean;
 }>();
 
@@ -146,7 +131,6 @@ const emit = defineEmits([
   'update:selectedAcademicYearId', 
   'update:selectedClassId', 
   'update:selectedTeacherId',
-  'update:maxPeriodNumber',
   'generate',
   'reset',
   'publish'

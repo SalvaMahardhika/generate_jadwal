@@ -33,7 +33,6 @@
         v-model:selectedAcademicYearId="wizardStore.selectedAcademicYearId"
         v-model:selectedClassId="wizardStore.selectedClassId"
         v-model:selectedTeacherId="wizardStore.selectedTeacherId"
-        v-model:maxPeriodNumber="wizardStore.maxPeriodNumber"
         :academicYears="academicYearsList"
         :classes="classesList"
         :teachers="teachersList"
@@ -127,14 +126,6 @@ const isInitializing = ref(true);
 
 const availableClassSubjects = computed(() => classSubjectsMap.value);
 
-const updateDefaultMaxPeriod = (selectedClass?: ClassItem) => {
-  if (!selectedClass) return;
-  const gradeSeq = selectedClass.grade?.sequence || 1;
-  if (gradeSeq <= 2) wizardStore.maxPeriodNumber = 6;
-  else if (gradeSeq <= 4) wizardStore.maxPeriodNumber = 8;
-  else wizardStore.maxPeriodNumber = 11;
-};
-
 const fetchDropdowns = async () => {
   try {
     const [ayRes, clsRes, tchrRes] = await Promise.all([
@@ -186,7 +177,7 @@ const fetchClassSubjects = async (classId: number) => {
               id: cst.id,
               class_subject_id: cs.id,
               teacher_id: cst.teacher_id,
-              jp: cst.jp, // PERBAIKAN: Sertakan jatah JP spesifik individu guru
+              jp: cst.jp,
               class_subject: cs,
               teacher: cst.teacher
             });
@@ -213,8 +204,6 @@ watch(() => wizardStore.selectedAcademicYearId, () => {
 
 watch(() => wizardStore.selectedClassId, async (newId) => {
   if (isInitializing.value || !newId) return;
-  const cls = classesList.value.find(c => c.id === newId);
-  updateDefaultMaxPeriod(cls);
   await fetchClassSubjects(newId);
   if (wizardStore.viewMode === 'class') {
     wizardStore.fetchClassMatrix(newId);
@@ -235,8 +224,6 @@ onMounted(async () => {
   await fetchDropdowns();
   
   if (wizardStore.selectedClassId) {
-    const cls = classesList.value.find(c => c.id === wizardStore.selectedClassId);
-    updateDefaultMaxPeriod(cls);
     await fetchClassSubjects(wizardStore.selectedClassId);
   }
 

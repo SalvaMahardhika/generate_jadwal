@@ -241,8 +241,6 @@ class ScheduleGeneratorService
                         continue;
                     }
 
-                    $maxJpPerDay = max(1, $cs->max_jp_per_day);
-
                     // Proses setiap guru pengampu berdasarkan alokasi JP individunya
                     foreach ($cs->classSubjectTeachers as $cst) {
                         $targetJpForThisTeacher = $cst->jp > 0 ? $cst->jp : $cs->total_jp;
@@ -256,6 +254,10 @@ class ScheduleGeneratorService
                             continue;
                         }
 
+                        // Jika max_jp_per_day diatur (>0), gunakan batasan tersebut.
+                        // Jika kosong/0, utamakan all-in pada hari yang sama ($targetJpForThisTeacher)
+                        $maxJpPerDay = ($cs->max_jp_per_day > 0) ? $cs->max_jp_per_day : $targetJpForThisTeacher;
+
                         $teacherId    = $cst->teacher_id;
                         $isSpecialist = ($teacherClassCounts->get($teacherId, 1) > 1);
 
@@ -267,8 +269,8 @@ class ScheduleGeneratorService
                                 'class_subject_teacher_id' => $cst->id,
                                 'teacher_id'               => $teacherId,
                                 'max_jp_per_day'           => $maxJpPerDay,
-                                'size'                     => $blockSize,
-                                'is_specialist'            => $isSpecialist,
+                                'size'                      => $blockSize,
+                                'is_specialist'             => $isSpecialist,
                             ];
                             $remainingToPlace -= $blockSize;
                         }
@@ -383,6 +385,12 @@ class ScheduleGeneratorService
                 for ($k = 0; $k < $blockSize; $k++) {
                     $slot = $daySlots->get($i + $k);
 
+                    // Pastikan jam pelajaran benar-benar berurutan secara period_number (tidak terpotong jam istirahat)
+                    if ($k > 0 && $slot->period_number !== $daySlots->get($i + $k - 1)->period_number + 1) {
+                        $canPlace = false;
+                        break;
+                    }
+
                     if ($lockedSchedules->has($slot->id)) {
                         $canPlace = false;
                         break;
@@ -444,7 +452,7 @@ class ScheduleGeneratorService
 
     /**
      * Penempatan / penggeseran jadwal secara manual dengan pengetatan validasi bentrok guru
-     * DAN validasi batas kuota JP individu guru.
+     * DAN validasi batas kuota JP individu guru (Mendukung Multi-Profil Slot Waktu & Mapel Ekuivalen Lintas Kelas).
      */
     public function manualAssign(array $data, int $userId): ?Schedule
     {
@@ -461,80 +469,138 @@ class ScheduleGeneratorService
 
         $applyToAll = !empty($data['apply_to_all_classes']);
 
-        $targetClassIds = [];
+        // 1. Dapatkan slot sumber untuk membaca hari dan jam ke-N (period_number)
+        $sourceSlot = TimeSlot::findOrFail($data['time_slot_id']);
+
+        // 2. Dapatkan objek kelas target lengkap beserta time_slot_profile_id masing-masing
         if ($applyToAll) {
-            $targetClassIds = Classes::where('academic_year_id', $data['academic_year_id'])
+            $targetClasses = Classes::where('academic_year_id', $data['academic_year_id'])
                 ->where('status', 'active')
-                ->pluck('id')
-                ->toArray();
+                ->get();
         } else {
-            $targetClassIds = [$data['class_id']];
+            $targetClasses = Classes::where('id', $data['class_id'])->get();
         }
 
+        // 3. Mapping class_subject_teacher_id ekuivalen untuk setiap kelas target
+        $targetCstMap = [];
         if (!empty($data['class_subject_teacher_id'])) {
-            $cst = ClassSubjectTeacher::with(['teacher', 'classSubject.subject'])->findOrFail($data['class_subject_teacher_id']);
+            $sourceCst = ClassSubjectTeacher::with(['teacher', 'classSubject.subject'])->findOrFail($data['class_subject_teacher_id']);
 
-            foreach ($targetClassIds as $targetClassId) {
-                // 1. Validasi Bentrok Jam Mengajar Guru di Kelas Lain
+            foreach ($targetClasses as $targetClass) {
+                if ($targetClass->id == $data['class_id']) {
+                    $targetCstMap[$targetClass->id] = $sourceCst;
+                } else {
+                    // Cari CST milik kelas target yang cocok berdasarkan subject_id dan teacher_id
+                    $foundCst = ClassSubjectTeacher::whereHas('classSubject', function ($q) use ($targetClass, $sourceCst) {
+                        $q->where('class_id', $targetClass->id)
+                          ->where('subject_id', $sourceCst->classSubject->subject_id);
+                    })
+                    ->where('teacher_id', $sourceCst->teacher_id)
+                    ->first();
+
+                    // Jika tidak ada guru spesifik yang sama, fallback ke subject_id ekuivalen di kelas target
+                    if (!$foundCst) {
+                        $foundCst = ClassSubjectTeacher::whereHas('classSubject', function ($q) use ($targetClass, $sourceCst) {
+                            $q->where('class_id', $targetClass->id)
+                              ->where('subject_id', $sourceCst->classSubject->subject_id);
+                        })->first();
+                    }
+
+                    $targetCstMap[$targetClass->id] = $foundCst;
+                }
+            }
+        }
+
+        // 4. Validasi untuk setiap kelas target
+        foreach ($targetClasses as $targetClass) {
+            // Cari slot ekuivalen untuk profil kelas ini (hari & jam ke-N sama)
+            $targetSlot = TimeSlot::where('time_slot_profile_id', $targetClass->time_slot_profile_id)
+                ->where('day', $sourceSlot->day)
+                ->where('period_number', $sourceSlot->period_number)
+                ->first();
+
+            if (!$targetSlot) {
+                continue; // Jika profil kelas tidak memiliki slot di jam/hari ini, lewati
+            }
+
+            $targetCst = $targetCstMap[$targetClass->id] ?? null;
+
+            if ($targetCst) {
+                // A. Validasi Bentrok Jam Mengajar Guru di Kelas Lain
                 $existingSchedule = Schedule::where('academic_year_id', $data['academic_year_id'])
-                    ->where('class_id', $targetClassId)
-                    ->where('time_slot_id', $data['time_slot_id'])
+                    ->where('class_id', $targetClass->id)
+                    ->where('time_slot_id', $targetSlot->id)
                     ->first();
 
                 $excludeId = $existingSchedule?->id;
 
-                $hasConflict = $this->checkTeacherConflict(
-                    $cst->teacher_id,
-                    $data['time_slot_id'],
-                    $data['academic_year_id'],
-                    $excludeId
-                );
+                if ($targetCst->teacher_id) {
+                    $hasConflict = $this->checkTeacherConflict(
+                        $targetCst->teacher_id,
+                        $targetSlot->id,
+                        $data['academic_year_id'],
+                        $excludeId
+                    );
 
-                if ($hasConflict) {
-                    $teacherName = $cst->teacher?->name ?? 'Guru';
-                    throw new Exception("Gagal assign manual: {$teacherName} sedang mengajar di kelas lain pada slot/rentang waktu ini.", 422);
+                    if ($hasConflict) {
+                        $teacherName = $targetCst->teacher?->name ?? 'Guru';
+                        throw new Exception("Gagal assign manual: {$teacherName} sedang mengajar di kelas lain pada slot/rentang waktu ini.", 422);
+                    }
                 }
 
-                // 2. Validasi Batas Kuota JP Guru Individu
-                $maxTeacherJp = $cst->jp > 0 ? $cst->jp : ($cst->classSubject?->total_jp ?? 0);
+                // B. Validasi Batas Kuota JP Guru Individu
+                $maxTeacherJp = $targetCst->jp > 0 ? $targetCst->jp : ($targetCst->classSubject?->total_jp ?? 0);
 
                 $currentAssignedCount = Schedule::where('academic_year_id', $data['academic_year_id'])
-                    ->where('class_id', $targetClassId)
-                    ->where('class_subject_teacher_id', $cst->id)
+                    ->where('class_id', $targetClass->id)
+                    ->where('class_subject_teacher_id', $targetCst->id)
                     ->when($excludeId, fn($q) => $q->where('id', '!=', $excludeId))
                     ->count();
 
                 if ($currentAssignedCount >= $maxTeacherJp) {
-                    $teacherName = $cst->teacher?->name ?? 'Guru';
-                    $subjectName = $cst->classSubject?->subject?->subject_name ?? 'Mata Pelajaran';
+                    $teacherName = $targetCst->teacher?->name ?? 'Guru';
+                    $subjectName = $targetCst->classSubject?->subject?->subject_name ?? 'Mata Pelajaran';
                     throw new Exception("Gagal assign manual: {$teacherName} sudah mencapai batas maksimal alokasi mengajar untuk {$subjectName} ({$maxTeacherJp} JP).", 422);
                 }
             }
         }
 
-        return DB::transaction(function () use ($data, $targetClassIds, $userId) {
+        // 5. Eksekusi simpan jadwal
+        return DB::transaction(function () use ($data, $targetClasses, $sourceSlot, $targetCstMap, $userId) {
             $isLocked = array_key_exists('is_locked', $data)
                 ? (bool) $data['is_locked']
                 : !empty($data['custom_activity']);
 
             $currentSchedule = null;
 
-            foreach ($targetClassIds as $classId) {
+            foreach ($targetClasses as $targetClass) {
+                // Cari slot spesifik milik profil kelas target
+                $targetSlot = TimeSlot::where('time_slot_profile_id', $targetClass->time_slot_profile_id)
+                    ->where('day', $sourceSlot->day)
+                    ->where('period_number', $sourceSlot->period_number)
+                    ->first();
+
+                if (!$targetSlot) {
+                    continue;
+                }
+
+                $targetCst = $targetCstMap[$targetClass->id] ?? null;
+
                 $schedule = Schedule::updateOrCreate(
                     [
                         'academic_year_id' => $data['academic_year_id'],
-                        'class_id'         => $classId,
-                        'time_slot_id'     => $data['time_slot_id'],
+                        'class_id'         => $targetClass->id,
+                        'time_slot_id'     => $targetSlot->id,
                     ],
                     [
-                        'class_subject_teacher_id' => $data['class_subject_teacher_id'] ?? null,
+                        'class_subject_teacher_id' => $targetCst?->id,
                         'custom_activity'          => $data['custom_activity'] ?? null,
                         'is_locked'                => $isLocked,
                         'created_by'               => $userId,
                     ]
                 );
 
-                if ($classId == $data['class_id']) {
+                if ($targetClass->id == $data['class_id']) {
                     $currentSchedule = $schedule;
                 }
             }
@@ -544,13 +610,29 @@ class ScheduleGeneratorService
     }
 
     /**
-     * Mengosongkan sel/slot spesifik.
+     * Mengosongkan sel/slot spesifik (Mendukung Multi-Profil Slot Waktu Lintas Kelas).
      */
     public function clearSlot(int $academicYearId, int $classId, int $timeSlotId, bool $clearAllClasses = false): bool
     {
+        if (!$clearAllClasses) {
+            return Schedule::where('academic_year_id', $academicYearId)
+                ->where('class_id', $classId)
+                ->where('time_slot_id', $timeSlotId)
+                ->delete() > 0;
+        }
+
+        // Jika opsi hapus dari semua kelas diaktifkan, cari slot yang ekuivalen (hari & jam ke-N sama) di seluruh profil
+        $sourceSlot = TimeSlot::find($timeSlotId);
+        if (!$sourceSlot) {
+            return false;
+        }
+
+        $equivalentSlotIds = TimeSlot::where('day', $sourceSlot->day)
+            ->where('period_number', $sourceSlot->period_number)
+            ->pluck('id');
+
         return Schedule::where('academic_year_id', $academicYearId)
-            ->where('time_slot_id', $timeSlotId)
-            ->when(!$clearAllClasses, fn($q) => $q->where('class_id', $classId))
+            ->whereIn('time_slot_id', $equivalentSlotIds)
             ->delete() > 0;
     }
 
