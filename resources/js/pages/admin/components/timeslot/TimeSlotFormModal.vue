@@ -16,9 +16,9 @@
               <!-- Hari & Urutan JP -->
               <div class="row g-3 mb-3">
                 <div class="col-12 col-sm-6">
-                  <label for="day" class="form-label fw-medium text-dark small">Hari <span class="text-danger">*</span></label>
+                  <label for="slot_day" class="form-label fw-medium text-dark small">Hari <span class="text-danger">*</span></label>
                   <select 
-                    id="day" 
+                    id="slot_day" 
                     class="form-select form-select-sm rounded-3 shadow-none text-capitalize"
                     :class="{ 'is-invalid': errors.day }"
                     v-model="form.day"
@@ -31,10 +31,10 @@
                 </div>
 
                 <div class="col-12 col-sm-6">
-                  <label for="period_number" class="form-label fw-medium text-dark small">Urutan Jam (JP Ke-) <span class="text-danger">*</span></label>
+                  <label for="slot_period_number" class="form-label fw-medium text-dark small">Urutan Jam (JP Ke-) <span class="text-danger">*</span></label>
                   <input 
                     type="number" 
-                    id="period_number" 
+                    id="slot_period_number" 
                     min="1"
                     class="form-control form-control-sm rounded-3 shadow-none"
                     :class="{ 'is-invalid': errors.period_number }"
@@ -49,10 +49,10 @@
               <!-- Waktu Mulai, Durasi (Menit), & Waktu Selesai -->
               <div class="row g-3 mb-3">
                 <div class="col-12 col-sm-4">
-                  <label for="start_time" class="form-label fw-medium text-dark small">Waktu Mulai <span class="text-danger">*</span></label>
+                  <label for="slot_start_time" class="form-label fw-medium text-dark small">Waktu Mulai <span class="text-danger">*</span></label>
                   <input 
                     type="text" 
-                    id="start_time" 
+                    id="slot_start_time" 
                     class="form-control form-control-sm rounded-3 shadow-none font-monospace"
                     :class="{ 'is-invalid': errors.start_time }"
                     placeholder="07:30"
@@ -67,10 +67,10 @@
                 </div>
 
                 <div class="col-12 col-sm-4">
-                  <label for="duration" class="form-label fw-medium text-dark small">Durasi (Menit) <span class="text-danger">*</span></label>
+                  <label for="slot_duration" class="form-label fw-medium text-dark small">Durasi (Menit) <span class="text-danger">*</span></label>
                   <input 
                     type="number" 
-                    id="duration" 
+                    id="slot_duration" 
                     min="1"
                     max="300"
                     class="form-control form-control-sm rounded-3 shadow-none"
@@ -83,10 +83,10 @@
                 </div>
 
                 <div class="col-12 col-sm-4">
-                  <label for="end_time" class="form-label fw-medium text-dark small">Waktu Selesai <span class="text-danger">*</span></label>
+                  <label for="slot_end_time" class="form-label fw-medium text-dark small">Waktu Selesai <span class="text-danger">*</span></label>
                   <input 
                     type="text" 
-                    id="end_time" 
+                    id="slot_end_time" 
                     class="form-control form-control-sm rounded-3 shadow-none font-monospace"
                     :class="{ 'is-invalid': errors.end_time }"
                     placeholder="08:15"
@@ -103,10 +103,10 @@
 
               <!-- Label / Keterangan -->
               <div class="mb-3">
-                <label for="label" class="form-label fw-medium text-dark small">Label / Keterangan (Opsional)</label>
+                <label for="slot_label" class="form-label fw-medium text-dark small">Label / Keterangan (Opsional)</label>
                 <input 
                   type="text" 
-                  id="label" 
+                  id="slot_label" 
                   class="form-control form-control-sm rounded-3 shadow-none"
                   :class="{ 'is-invalid': errors.label }"
                   placeholder="Contoh: JP 10 (13.15 - 13.50) atau Istirahat Kedua"

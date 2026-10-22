@@ -22,6 +22,7 @@ export interface ClassItem {
   major_id?: number | null;
   academic_year_id: number;
   homeroom_teacher_id?: number | null;
+  time_slot_profile_id?: number | null;
   status: ClassStatus;
   created_at?: string;
   updated_at?: string;
@@ -30,6 +31,7 @@ export interface ClassItem {
   major?: Major;
   academic_year?: AcademicYear;
   homeroom_teacher?: TeacherOption;
+  time_slot_profile?: { id: number; name: string } | null;
 }
 
 export interface ClassPayload {

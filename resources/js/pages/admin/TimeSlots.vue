@@ -6,13 +6,14 @@
       <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-4 pb-2 border-bottom">
         <div>
           <h5 class="fw-bold text-dark mb-1">Jam & Slot Waktu</h5>
-          <p class="text-secondary small mb-0">Kelola master jam pelajaran (JP), jam istirahat, dan alokasi waktu per hari.</p>
+          <p class="text-secondary small mb-0">Kelola master jam pelajaran (JP), jam istirahat, dan profil slot waktu per jenjang/kelas.</p>
         </div>
         <div class="d-flex align-items-center gap-2">
           <!-- Tombol Generate Otomatis -->
           <button 
             type="button" 
             class="btn btn-outline-primary rounded-3 py-2 px-3 small fw-medium d-flex align-items-center gap-2"
+            :disabled="!timeSlotStore.activeProfileId"
             @click="openGenerateModal()"
           >
             <i class="bi bi-magic"></i>
@@ -23,6 +24,7 @@
           <button 
             type="button" 
             class="btn btn-primary rounded-3 py-2 px-3 small fw-medium d-flex align-items-center gap-2"
+            :disabled="!timeSlotStore.activeProfileId"
             @click="openCreateModal()"
           >
             <i class="bi bi-plus-lg"></i>
@@ -49,6 +51,14 @@
         <button type="button" class="btn-close small" @click="timeSlotStore.errorMessage = null"></button>
       </div>
 
+      <!-- Selector Tab Profil Slot Waktu -->
+      <ProfileTabSelector
+        @openCreateProfile="openCreateProfileModal"
+        @openEditProfile="openEditProfileModal"
+        @openAssignClasses="openAssignClassesModal"
+        @openDeleteProfile="confirmDeleteProfile"
+      />
+
       <!-- Filter Bar -->
       <TimeSlotFilter :daysList="daysList" />
 
@@ -59,7 +69,7 @@
       </div>
 
       <!-- Grid Cards Per Hari -->
-      <div v-else class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3">
+      <div v-else-if="timeSlotStore.activeProfileId" class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3">
         <div v-for="day in activeDays" :key="day" class="col">
           <TimeSlotDayCard 
             :day="day"
@@ -72,9 +82,40 @@
         </div>
       </div>
 
+      <!-- Empty State ketika belum ada profil -->
+      <div v-else class="text-center py-5 bg-white rounded-3 border text-muted">
+        <i class="bi bi-collection fs-2 d-block mb-2 text-secondary"></i>
+        <p class="small mb-2">Belum ada profil slot waktu yang dipilih atau dibuat.</p>
+        <button type="button" class="btn btn-sm btn-primary rounded-3" @click="openCreateProfileModal">
+          Buat Profil Slot Pertama
+        </button>
+      </div>
+
     </div>
 
-    <!-- Modal Form (Tambah / Edit Manual) -->
+    <!-- Modal Form Profil Slot (Tambah / Edit) -->
+    <ProfileFormModal
+      :show="showProfileModal"
+      :isEditing="isEditingProfile"
+      :isSaving="timeSlotStore.isSaving"
+      :form="profileForm"
+      :errors="profileErrors"
+      @close="closeProfileModal"
+      @submit="submitProfileForm"
+    />
+
+    <!-- Modal Plotting Profil ke Kelas -->
+    <AssignProfileModal
+      :show="showAssignModal"
+      :profile="timeSlotStore.activeProfile"
+      :isSaving="timeSlotStore.isSaving"
+      :isLoadingClasses="isLoadingClasses"
+      :classList="classList"
+      @close="closeAssignModal"
+      @submit="submitAssignClasses"
+    />
+
+    <!-- Modal Form Slot Waktu (Tambah / Edit Manual) -->
     <TimeSlotFormModal 
       :show="showFormModal"
       :isEditing="isEditing"
@@ -119,11 +160,30 @@ import TimeSlotDayCard from './components/timeslot/TimeSlotDayCard.vue';
 import TimeSlotFormModal from './components/timeslot/TimeSlotFormModal.vue';
 import TimeSlotDeleteModal from './components/timeslot/TimeSlotDeleteModal.vue';
 import TimeSlotGenerateModal from './components/timeslot/TimeSlotGenerateModal.vue';
+import ProfileTabSelector from './components/timeslot/profile/ProfileTabSelector.vue';
+import ProfileFormModal from './components/timeslot/profile/ProfileFormModal.vue';
+import AssignProfileModal from './components/timeslot/profile/AssignProfileModal.vue';
 import { useTimeSlotStore } from '../../stores/timeSlot';
-import type { TimeSlot, TimeSlotPayload, DayOfWeek, GenerateTimeSlotPayload } from '../../types/timeSlot';
+import api from '../../services/api';
+import type { TimeSlot, TimeSlotPayload, DayOfWeek, GenerateTimeSlotPayload, TimeSlotProfile, TimeSlotProfilePayload } from '../../types/timeSlot';
 
 const timeSlotStore = useTimeSlotStore();
 
+// --- STATE MODAL PROFIL ---
+const showProfileModal = ref(false);
+const isEditingProfile = ref(false);
+const showAssignModal = ref(false);
+const isLoadingClasses = ref(false);
+const classList = ref<any[]>([]);
+
+const profileForm = reactive<TimeSlotProfilePayload>({
+  academic_year_id: 1,
+  name: '',
+  description: '',
+});
+const profileErrors = reactive<Record<string, string[]>>({});
+
+// --- STATE MODAL SLOT WAKTU ---
 const showFormModal = ref(false);
 const showDeleteModal = ref(false);
 const showGenerateModal = ref(false);
@@ -158,7 +218,6 @@ const groupedTimeSlots = computed(() => {
     }
   });
 
-  // Urutkan slot berdasarkan period_number secara kronologis
   Object.keys(map).forEach((dayKey) => {
     map[dayKey as DayOfWeek].sort((a, b) => a.period_number - b.period_number);
   });
@@ -178,9 +237,79 @@ const form = reactive<TimeSlotPayload>({
 const formErrors = reactive<Record<string, string[]>>({});
 
 onMounted(() => {
-  timeSlotStore.fetchTimeSlots();
+  timeSlotStore.fetchProfiles();
 });
 
+// --- METODE PROFIL ---
+const openCreateProfileModal = () => {
+  isEditingProfile.value = false;
+  profileForm.name = '';
+  profileForm.description = '';
+  Object.keys(profileErrors).forEach(k => delete profileErrors[k]);
+  showProfileModal.value = true;
+};
+
+const openEditProfileModal = (profile: TimeSlotProfile) => {
+  isEditingProfile.value = true;
+  profileForm.academic_year_id = profile.academic_year_id;
+  profileForm.name = profile.name;
+  profileForm.description = profile.description || '';
+  Object.keys(profileErrors).forEach(k => delete profileErrors[k]);
+  showProfileModal.value = true;
+};
+
+const closeProfileModal = () => {
+  if (!timeSlotStore.isSaving) showProfileModal.value = false;
+};
+
+const submitProfileForm = async () => {
+  Object.keys(profileErrors).forEach(k => delete profileErrors[k]);
+  let res;
+  if (isEditingProfile.value && timeSlotStore.activeProfileId) {
+    res = await timeSlotStore.updateProfile(timeSlotStore.activeProfileId, profileForm);
+  } else {
+    res = await timeSlotStore.createProfile(profileForm);
+  }
+
+  if (res.success) {
+    showProfileModal.value = false;
+  } else if (res.errors) {
+    Object.assign(profileErrors, res.errors);
+  }
+};
+
+const confirmDeleteProfile = async (profile: TimeSlotProfile) => {
+  if (confirm(`Apakah Anda yakin ingin menghapus profil "${profile.name}"? Seluruh slot waktu dalam profil ini akan ikut terhapus.`)) {
+    await timeSlotStore.deleteProfile(profile.id);
+  }
+};
+
+const openAssignClassesModal = async (profile: TimeSlotProfile) => {
+  showAssignModal.value = true;
+  isLoadingClasses.value = true;
+  try {
+    const res = await api.get('/classes', { params: { academic_year_id: profile.academic_year_id } });
+    classList.value = res.data?.data || res.data || [];
+  } catch (err) {
+    classList.value = [];
+  } finally {
+    isLoadingClasses.value = false;
+  }
+};
+
+const closeAssignModal = () => {
+  if (!timeSlotStore.isSaving) showAssignModal.value = false;
+};
+
+const submitAssignClasses = async (classIds: number[]) => {
+  if (!timeSlotStore.activeProfileId) return;
+  const res = await timeSlotStore.assignProfileToClasses(timeSlotStore.activeProfileId, classIds);
+  if (res.success) {
+    showAssignModal.value = false;
+  }
+};
+
+// --- METODE DETAIL SLOT WAKTU ---
 const formatTime = (timeStr: string) => {
   if (!timeStr) return '';
   return timeStr.substring(0, 5);
@@ -279,7 +408,10 @@ const closeGenerateModal = () => {
 };
 
 const submitGenerate = async (payload: GenerateTimeSlotPayload) => {
-  const result = await timeSlotStore.generateTimeSlots(payload);
+  const result = await timeSlotStore.generateTimeSlots({
+    ...payload,
+    time_slot_profile_id: timeSlotStore.activeProfileId!,
+  });
   if (result.success) {
     showGenerateModal.value = false;
   }
@@ -336,6 +468,7 @@ const submitForm = async () => {
   }
 
   const payload: TimeSlotPayload = {
+    time_slot_profile_id: timeSlotStore.activeProfileId!,
     day: form.day,
     period_number: form.period_number,
     label: form.label ? form.label.trim() : null,
@@ -384,7 +517,6 @@ const confirmDelete = async () => {
   deleteErrorMessage.value = null;
 
   if (isClearDayAction.value && selectedDayToClear.value) {
-    // Memanggil aksi bulk delete 1 kali HTTP request
     const result = await timeSlotStore.deleteTimeSlotsByDay(selectedDayToClear.value);
 
     if (result.success) {

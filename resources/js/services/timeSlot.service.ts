@@ -6,6 +6,10 @@ export const TimeSlotService = {
   async getAll(params?: TimeSlotFilter): Promise<ApiResponse<TimeSlot[]>> {
     const cleanParams: Record<string, any> = {};
 
+    if (params?.time_slot_profile_id) {
+      cleanParams.time_slot_profile_id = params.time_slot_profile_id;
+    }
+
     if (params?.day) {
       cleanParams.day = params.day;
     }
@@ -39,10 +43,12 @@ export const TimeSlotService = {
   },
 
   /**
-   * Menghapus seluruh slot waktu pada hari tertentu dalam 1 kali HTTP request.
+   * Menghapus seluruh slot waktu pada hari tertentu untuk profil tertentu.
    */
-  async deleteByDay(day: string): Promise<ApiResponse<null>> {
-    const response = await api.delete<ApiResponse<null>>(`/time-slots/day/${day}`);
+  async deleteByDay(day: string, profileId?: number | null): Promise<ApiResponse<null>> {
+    const response = await api.delete<ApiResponse<null>>(`/time-slots/day/${day}`, {
+      params: profileId ? { time_slot_profile_id: profileId } : undefined,
+    });
     return response.data;
   },
 

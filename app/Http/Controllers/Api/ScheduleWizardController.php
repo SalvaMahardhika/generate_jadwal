@@ -22,19 +22,23 @@ class ScheduleWizardController extends Controller
     ) {}
 
     /**
-     * 1. Class View: Matriks jadwal per kelas.
+     * 1. Class View: Matriks jadwal per kelas (menggunakan profil slot waktu kelas terkait).
      */
     public function getMatrix(Request $request, Classes $class): JsonResponse
     {
         $academicYearId = $request->query('academic_year_id', $class->academic_year_id);
+        $profileId      = $request->query('time_slot_profile_id', $class->time_slot_profile_id);
 
-        $timeSlots = TimeSlot::orderByRaw("FIELD(day, 'senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu')")
+        $timeSlots = TimeSlot::query()
+            ->when($profileId, fn($q) => $q->where('time_slot_profile_id', $profileId))
+            ->orderByRaw("FIELD(day, 'senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu')")
             ->orderBy('period_number', 'asc')
             ->get();
 
         $schedules = Schedule::with([
             'classSubjectTeacher.classSubject.subject',
             'classSubjectTeacher.teacher',
+            'timeSlot',
         ])
         ->where('academic_year_id', $academicYearId)
         ->where('class_id', $class->id)
@@ -50,12 +54,13 @@ class ScheduleWizardController extends Controller
                     'grade',
                     'major',
                     'academicYear',
+                    'timeSlotProfile',
                     'classSubjects.subject',
                     'classSubjects.classSubjectTeachers.teacher',
                 ]),
                 'time_slots' => $timeSlots,
-                'schedules' => $schedules,
-                'balance' => $balance,
+                'schedules'  => $schedules,
+                'balance'    => $balance,
             ],
         ]);
     }
@@ -70,15 +75,23 @@ class ScheduleWizardController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Academic year ID wajib diisi.'], 422);
         }
 
-        $timeSlots = TimeSlot::orderByRaw("FIELD(day, 'senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu')")
+        $profileId = $request->query('time_slot_profile_id');
+
+        $timeSlots = TimeSlot::query()
+            ->when($profileId, fn($q) => $q->where('time_slot_profile_id', $profileId))
+            ->orderByRaw("FIELD(day, 'senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu')")
             ->orderBy('period_number', 'asc')
             ->get();
 
-        $data = $this->generatorService->getTeacherMatrixData($teacher->id, (int)$academicYearId);
+        $data = $this->generatorService->getTeacherMatrixData(
+            $teacher->id,
+            (int) $academicYearId,
+            $profileId ? (int) $profileId : null
+        );
 
         return response()->json([
             'status' => 'success',
-            'data' => array_merge($data, ['time_slots' => $timeSlots]),
+            'data'   => array_merge($data, ['time_slots' => $timeSlots]),
         ]);
     }
 
@@ -92,15 +105,22 @@ class ScheduleWizardController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Academic year ID wajib diisi.'], 422);
         }
 
-        $timeSlots = TimeSlot::orderByRaw("FIELD(day, 'senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu')")
+        $profileId = $request->query('time_slot_profile_id');
+
+        $timeSlots = TimeSlot::query()
+            ->when($profileId, fn($q) => $q->where('time_slot_profile_id', $profileId))
+            ->orderByRaw("FIELD(day, 'senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu')")
             ->orderBy('period_number', 'asc')
             ->get();
 
-        $data = $this->generatorService->getMasterMatrixData((int)$academicYearId);
+        $data = $this->generatorService->getMasterMatrixData(
+            (int) $academicYearId,
+            $profileId ? (int) $profileId : null
+        );
 
         return response()->json([
             'status' => 'success',
-            'data' => array_merge($data, ['time_slots' => $timeSlots]),
+            'data'   => array_merge($data, ['time_slots' => $timeSlots]),
         ]);
     }
 
@@ -114,7 +134,7 @@ class ScheduleWizardController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'data' => $balance,
+            'data'   => $balance,
         ]);
     }
 
@@ -133,16 +153,16 @@ class ScheduleWizardController extends Controller
             );
 
             return response()->json([
-                'status' => 'success',
+                'status'  => 'success',
                 'message' => 'Proses auto-generate jadwal berhasil diselesaikan.',
-                'data' => $result,
+                'data'    => $result,
             ]);
         } catch (Exception $e) {
             $code = (int) $e->getCode();
             $statusCode = ($code >= 400 && $code <= 599) ? $code : 500;
 
             return response()->json([
-                'status' => 'error',
+                'status'  => 'error',
                 'message' => $e->getMessage(),
             ], $statusCode);
         }
@@ -154,20 +174,20 @@ class ScheduleWizardController extends Controller
     public function lockSlot(LockSlotRequest $request): JsonResponse
     {
         try {
-            $userId = $request->user()?->id ?? 1;
+            $userId   = $request->user()?->id ?? 1;
             $schedule = $this->generatorService->lockSlot($request->validated(), $userId);
 
             return response()->json([
-                'status' => 'success',
+                'status'  => 'success',
                 'message' => 'Status kuncian slot berhasil diperbarui.',
-                'data' => $schedule,
+                'data'    => $schedule,
             ]);
         } catch (Exception $e) {
             $code = (int) $e->getCode();
             $statusCode = ($code >= 400 && $code <= 599) ? $code : 500;
 
             return response()->json([
-                'status' => 'error',
+                'status'  => 'error',
                 'message' => $e->getMessage(),
             ], $statusCode);
         }
@@ -179,20 +199,20 @@ class ScheduleWizardController extends Controller
     public function manualAssign(ManualAssignScheduleRequest $request): JsonResponse
     {
         try {
-            $userId = $request->user()?->id ?? 1;
+            $userId   = $request->user()?->id ?? 1;
             $schedule = $this->generatorService->manualAssign($request->validated(), $userId);
 
             return response()->json([
-                'status' => 'success',
+                'status'  => 'success',
                 'message' => 'Jadwal berhasil diperbarui secara manual.',
-                'data' => $schedule,
+                'data'    => $schedule,
             ]);
         } catch (Exception $e) {
             $code = (int) $e->getCode();
             $statusCode = ($code >= 400 && $code <= 599) ? $code : 422;
 
             return response()->json([
-                'status' => 'error',
+                'status'  => 'error',
                 'message' => $e->getMessage(),
             ], $statusCode);
         }
@@ -204,9 +224,9 @@ class ScheduleWizardController extends Controller
     public function clearSlot(Request $request): JsonResponse
     {
         $request->validate([
-            'academic_year_id' => ['required', 'exists:academic_years,id'],
-            'class_id' => ['required', 'exists:classes,id'],
-            'time_slot_id' => ['required', 'exists:time_slots,id'],
+            'academic_year_id'  => ['required', 'exists:academic_years,id'],
+            'class_id'          => ['required', 'exists:classes,id'],
+            'time_slot_id'      => ['required', 'exists:time_slots,id'],
             'clear_all_classes' => ['nullable', 'boolean'],
         ]);
 
@@ -218,7 +238,7 @@ class ScheduleWizardController extends Controller
         );
 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => $cleared ? 'Slot berhasil dikosongkan.' : 'Slot sudah kosong.',
         ]);
     }
@@ -230,7 +250,7 @@ class ScheduleWizardController extends Controller
     {
         $request->validate([
             'academic_year_id' => ['required', 'exists:academic_years,id'],
-            'class_id' => ['nullable', 'exists:classes,id'],
+            'class_id'         => ['nullable', 'exists:classes,id'],
         ]);
 
         $affected = $this->generatorService->resetSchedule(
@@ -239,7 +259,7 @@ class ScheduleWizardController extends Controller
         );
 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => "Berhasil menghapus {$affected} entri jadwal yang tidak dikunci.",
         ]);
     }
@@ -251,7 +271,7 @@ class ScheduleWizardController extends Controller
     {
         $request->validate([
             'academic_year_id' => ['required', 'exists:academic_years,id'],
-            'class_id' => ['nullable', 'exists:classes,id'],
+            'class_id'         => ['nullable', 'exists:classes,id'],
         ]);
 
         $affected = $this->generatorService->publish(
@@ -260,7 +280,7 @@ class ScheduleWizardController extends Controller
         );
 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => "Berhasil mempublikasikan {$affected} entri jadwal.",
         ]);
     }
@@ -272,7 +292,7 @@ class ScheduleWizardController extends Controller
     {
         $request->validate([
             'academic_year_id' => ['required', 'exists:academic_years,id'],
-            'class_id' => ['nullable', 'exists:classes,id'],
+            'class_id'         => ['nullable', 'exists:classes,id'],
         ]);
 
         $affected = $this->generatorService->unpublish(
@@ -281,7 +301,7 @@ class ScheduleWizardController extends Controller
         );
 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => "Berhasil mengembalikan {$affected} entri jadwal menjadi draft.",
         ]);
     }

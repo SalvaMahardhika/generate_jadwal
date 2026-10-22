@@ -26,6 +26,10 @@ class ClassController extends Controller
             $request->query('status')
         );
 
+        if (method_exists($classes, 'load')) {
+            $classes->load(['timeSlotProfile:id,name']);
+        }
+
         return response()->json([
             'status' => 'success',
             'data' => $classes,
@@ -47,7 +51,7 @@ class ClassController extends Controller
     {
         return response()->json([
             'status' => 'success',
-            'data' => $class->load(['grade', 'major', 'academicYear', 'homeroomTeacher']),
+            'data' => $class->load(['grade', 'major', 'academicYear', 'homeroomTeacher', 'timeSlotProfile:id,name']),
         ]);
     }
 

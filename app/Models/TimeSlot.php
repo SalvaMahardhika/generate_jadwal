@@ -10,6 +10,7 @@ class TimeSlot extends Model
     use HasFactory;
 
     protected $fillable = [
+        'time_slot_profile_id',
         'day',
         'period_number',
         'label',
@@ -21,6 +22,11 @@ class TimeSlot extends Model
     protected $casts = [
         'is_break' => 'boolean',
     ];
+
+    public function timeSlotProfile()
+    {
+        return $this->belongsTo(TimeSlotProfile::class, 'time_slot_profile_id');
+    }
 
     public function schedules()
     {

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\TimeSlot\GenerateTimeSlotRequest;
 use App\Http\Requests\TimeSlot\StoreTimeSlotRequest;
 use App\Http\Requests\TimeSlot\UpdateTimeSlotRequest;
 use App\Models\TimeSlot;
@@ -19,17 +20,18 @@ class TimeSlotController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        // Menggunakan filled() agar query parameter yang bernilai empty string ("") diabaikan/bernilai null
-        $isBreak = $request->filled('is_break') ? $request->boolean('is_break') : null;
+        $profileId = $request->query('time_slot_profile_id');
+        $isBreak   = $request->filled('is_break') ? $request->boolean('is_break') : null;
 
         $timeSlots = $this->timeSlotService->getAll(
+            $profileId ? (int) $profileId : null,
             $request->query('day'),
             $isBreak
         );
 
         return response()->json([
             'status' => 'success',
-            'data' => $timeSlots,
+            'data'   => $timeSlots,
         ]);
     }
 
@@ -38,9 +40,9 @@ class TimeSlotController extends Controller
         $timeSlot = $this->timeSlotService->create($request->validated());
 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => 'Slot waktu berhasil ditambahkan.',
-            'data' => $timeSlot,
+            'data'    => $timeSlot,
         ], 201);
     }
 
@@ -48,7 +50,7 @@ class TimeSlotController extends Controller
     {
         return response()->json([
             'status' => 'success',
-            'data' => $timeSlot,
+            'data'   => $timeSlot->load('timeSlotProfile'),
         ]);
     }
 
@@ -57,9 +59,9 @@ class TimeSlotController extends Controller
         $updated = $this->timeSlotService->update($timeSlot, $request->validated());
 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => 'Slot waktu berhasil diperbarui.',
-            'data' => $updated,
+            'data'    => $updated,
         ]);
     }
 
@@ -69,7 +71,7 @@ class TimeSlotController extends Controller
             $this->timeSlotService->delete($timeSlot);
 
             return response()->json([
-                'status' => 'success',
+                'status'  => 'success',
                 'message' => 'Slot waktu berhasil dihapus.',
             ]);
         } catch (Exception $e) {
@@ -77,22 +79,23 @@ class TimeSlotController extends Controller
             $statusCode = ($code >= 400 && $code <= 599) ? $code : 500;
 
             return response()->json([
-                'status' => 'error',
+                'status'  => 'error',
                 'message' => $e->getMessage(),
             ], $statusCode);
         }
     }
 
     /**
-     * Menghapus seluruh slot waktu pada hari tertentu (Bulk Delete).
+     * Menghapus seluruh slot waktu pada hari tertentu milik profil tertentu (Bulk Delete).
      */
-    public function clearByDay(string $day): JsonResponse
+    public function clearByDay(Request $request, string $day): JsonResponse
     {
         try {
-            $affected = $this->timeSlotService->deleteByDay($day);
+            $profileId = $request->query('time_slot_profile_id');
+            $affected  = $this->timeSlotService->deleteByDay($day, $profileId ? (int) $profileId : null);
 
             return response()->json([
-                'status' => 'success',
+                'status'  => 'success',
                 'message' => "Berhasil menghapus {$affected} slot waktu pada hari " . ucfirst($day) . ".",
             ]);
         } catch (Exception $e) {
@@ -100,44 +103,31 @@ class TimeSlotController extends Controller
             $statusCode = ($code >= 400 && $code <= 599) ? $code : 500;
 
             return response()->json([
-                'status' => 'error',
+                'status'  => 'error',
                 'message' => $e->getMessage(),
             ], $statusCode);
         }
     }
 
     /**
-     * Otomatis meng-generate seluruh jam pelajaran & istirahat berdasarkan parameter.
+     * Otomatis meng-generate seluruh jam pelajaran & istirahat berdasarkan parameter profil.
      */
-    public function generate(Request $request): JsonResponse
+    public function generate(GenerateTimeSlotRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'start_time' => 'required|string',
-            'period_duration' => 'required|integer|min:15|max:120',
-            'days' => 'required|array|min:1',
-            'days.*' => 'required|string|in:senin,selasa,rabu,kamis,jumat,sabtu',
-            'periods_per_day' => 'required|array',
-            'breaks' => 'nullable|array',
-            'breaks.*.after_period' => 'required|integer|min:1',
-            'breaks.*.duration' => 'required|integer|min:5|max:120',
-            'breaks.*.label' => 'nullable|string|max:100',
-            'overwrite' => 'nullable|boolean',
-        ]);
-
         try {
-            $slots = $this->timeSlotService->generate($validated);
+            $slots = $this->timeSlotService->generate($request->validated());
 
             return response()->json([
-                'status' => 'success',
+                'status'  => 'success',
                 'message' => 'Slot waktu berhasil di-generate secara otomatis.',
-                'data' => $slots,
+                'data'    => $slots,
             ], 201);
         } catch (Exception $e) {
             $code = (int) $e->getCode();
             $statusCode = ($code >= 400 && $code <= 599) ? $code : 500;
 
             return response()->json([
-                'status' => 'error',
+                'status'  => 'error',
                 'message' => $e->getMessage(),
             ], $statusCode);
         }

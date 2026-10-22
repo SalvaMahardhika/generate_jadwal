@@ -23,10 +23,10 @@
                 </h6>
                 <div class="row g-3">
                   <div class="col-12 col-sm-6">
-                    <label for="start_time" class="form-label fw-medium text-dark small">Jam Mulai Sekolah <span class="text-danger">*</span></label>
+                    <label for="gen_start_time" class="form-label fw-medium text-dark small">Jam Mulai Sekolah <span class="text-danger">*</span></label>
                     <input 
                       type="text" 
-                      id="start_time" 
+                      id="gen_start_time" 
                       class="form-control form-control-sm rounded-3 shadow-none font-monospace"
                       placeholder="07:00"
                       maxlength="5"
@@ -37,10 +37,10 @@
                   </div>
 
                   <div class="col-12 col-sm-6">
-                    <label for="period_duration" class="form-label fw-medium text-dark small">Durasi 1 JP (Menit) <span class="text-danger">*</span></label>
+                    <label for="gen_period_duration" class="form-label fw-medium text-dark small">Durasi 1 JP (Menit) <span class="text-danger">*</span></label>
                     <input 
                       type="number" 
-                      id="period_duration" 
+                      id="gen_period_duration" 
                       min="15"
                       max="120"
                       class="form-control form-control-sm rounded-3 shadow-none"
@@ -118,7 +118,7 @@
                   <div 
                     v-for="(b, index) in form.breaks" 
                     :key="index"
-                    class="p-2.5 bg-light rounded-3 border d-flex flex-wrap align-items-center gap-2"
+                    class="p-2 bg-light rounded-3 border d-flex flex-wrap align-items-center gap-2"
                   >
                     <div class="d-flex align-items-center gap-1 flex-grow-1">
                       <span class="fs-8 text-muted flex-shrink-0">Setelah JP Ke-</span>

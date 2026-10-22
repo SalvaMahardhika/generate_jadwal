@@ -16,6 +16,7 @@ class Classes extends Model
         'grade_id',
         'major_id',
         'academic_year_id',
+        'time_slot_profile_id',
         'homeroom_teacher_id',
         'status',
     ];
@@ -33,6 +34,11 @@ class Classes extends Model
     public function academicYear()
     {
         return $this->belongsTo(AcademicYear::class);
+    }
+
+    public function timeSlotProfile()
+    {
+        return $this->belongsTo(TimeSlotProfile::class, 'time_slot_profile_id');
     }
 
     public function homeroomTeacher()

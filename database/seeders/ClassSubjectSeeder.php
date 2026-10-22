@@ -23,12 +23,17 @@ class ClassSubjectSeeder extends Seeder
         $subjects = Subject::all()->keyBy('subject_code');
         $teachers = Teacher::all();
 
-        // Ambil Guru Spesialis berdasarkan NIP
+        // Ambil Guru Spesialis & Tim Pengampu Serentak berdasarkan NIP
         $pabpTeachers  = $teachers->whereIn('nip', ['198609202012011008'])->values(); // PABP & BTQ
         $pjokTeachers  = $teachers->whereIn('nip', ['199104122016011007'])->values(); // PJOK
         $bingTeachers  = $teachers->whereIn('nip', ['199406142020022009'])->values(); // B. Inggris / Seni
         $bjawaTeachers = $teachers->whereIn('nip', ['199307222019022010'])->values(); // B. Jawa
         $aiTeachers    = $teachers->whereIn('nip', ['199510102022011011'])->values(); // Koding & AI
+
+        // Tim Utama Kokurikuler (Tim Tetap Lintas Kelas untuk Kegiatan Serentak)
+        // Contoh: Rina Utami (Seni/Inggris) & Sri Wahyuni (B. Jawa)
+        $kokurikulerLeadTeacher = $bingTeachers->first() ?? $teachers->first();
+        $kokurikulerCoTeacher   = $bjawaTeachers->first() ?? $teachers->last();
 
         foreach ($classes as $class) {
             $sequence = $class->grade?->sequence ?? 1;
@@ -81,22 +86,22 @@ class ClassSubjectSeeder extends Seeder
                 $homeroomTeacherId = $class->homeroom_teacher_id ?? $teachers->first()->id;
 
                 if ($code === 'KOKURIKULER') {
-                    // Skenario Team Teaching 1: Kokurikuler (5 JP) -> Wali Kelas (3 JP) + Guru Seni/Inggris (2 JP)
-                    $assistantTeacherId = $bingTeachers->first()?->id ?? $teachers->last()->id;
-
+                    // Skenario Team Teaching Kokurikuler (5 JP):
+                    // Menggunakan Tim Pengampu Tetap yang Sama di Seluruh Kelas
+                    // Guru Utama (3 JP) + Guru Pendamping (2 JP)
                     ClassSubjectTeacher::create([
                         'class_subject_id' => $classSubject->id,
-                        'teacher_id' => $homeroomTeacherId,
+                        'teacher_id' => $kokurikulerLeadTeacher->id,
                         'jp' => 3,
                     ]);
 
                     ClassSubjectTeacher::create([
                         'class_subject_id' => $classSubject->id,
-                        'teacher_id' => $assistantTeacherId,
+                        'teacher_id' => $kokurikulerCoTeacher->id,
                         'jp' => 2,
                     ]);
                 } elseif ($code === 'BINDO' && $sequence >= 3) {
-                    // Skenario Team Teaching 2: Bahasa Indonesia Kelas Tinggi (6 JP) -> Wali Kelas (4 JP) + Guru B. Jawa (2 JP)
+                    // Skenario Team Teaching Bahasa Indonesia Kelas Tinggi (6 JP) -> Wali Kelas (4 JP) + Guru B. Jawa (2 JP)
                     $assistantTeacherId = $bjawaTeachers->first()?->id ?? $teachers->last()->id;
 
                     ClassSubjectTeacher::create([

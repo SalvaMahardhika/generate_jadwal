@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\MajorController;
 use App\Http\Controllers\Api\TeacherController;
 use App\Http\Controllers\Api\SubjectController;
 use App\Http\Controllers\Api\TimeSlotController;
+use App\Http\Controllers\Api\TimeSlotProfileController;
 use App\Http\Controllers\Api\ClassController;
 use App\Http\Controllers\Api\ClassSubjectController;
 use App\Http\Controllers\Api\ScheduleWizardController;
@@ -84,6 +85,17 @@ Route::prefix('v1')->group(function () {
         Route::get('/{subject}', [SubjectController::class, 'show']);
         Route::put('/{subject}', [SubjectController::class, 'update']);
         Route::delete('/{subject}', [SubjectController::class, 'destroy']);
+    });
+
+    // Master Profil Slot Waktu (Template Jam)
+    Route::prefix('time-slot-profiles')->group(function () {
+        Route::get('/', [TimeSlotProfileController::class, 'index']);
+        Route::post('/', [TimeSlotProfileController::class, 'store']);
+        Route::get('/{timeSlotProfile}', [TimeSlotProfileController::class, 'show']);
+        Route::put('/{timeSlotProfile}', [TimeSlotProfileController::class, 'update']);
+        Route::delete('/{timeSlotProfile}', [TimeSlotProfileController::class, 'destroy']);
+        Route::post('/{timeSlotProfile}/assign-classes', [TimeSlotProfileController::class, 'assignToClasses']);
+        Route::post('/{timeSlotProfile}/duplicate', [TimeSlotProfileController::class, 'duplicate']);
     });
 
     // Slot Waktu / Jam Pelajaran
