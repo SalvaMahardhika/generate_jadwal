@@ -101,7 +101,21 @@ export const useTimeSlotStore = defineStore('timeSlot', () => {
       if (response.status === 'success' && response.data) {
         successMessage.value = response.message || 'Profil berhasil diperbarui.';
         const idx = profiles.value.findIndex((p) => p.id === id);
-        if (idx !== -1) profiles.value[idx] = response.data;
+        if (idx !== -1) {
+          const oldProfile = profiles.value[idx];
+          const updated = response.data;
+          
+          // Gabungkan data profil dengan mempertahankan classes_count & classes jika server tidak mengirimkannya
+          profiles.value[idx] = {
+            ...oldProfile,
+            ...updated,
+            classes_count:
+              updated.classes_count ??
+              updated.classes?.length ??
+              oldProfile.classes_count,
+            classes: updated.classes ?? oldProfile.classes,
+          };
+        }
         return { success: true, data: response.data };
       }
       return { success: false, message: response.message };

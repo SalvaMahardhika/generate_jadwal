@@ -55,12 +55,14 @@ class TimeSlotProfileService
                     ->update(['is_default' => false]);
             }
 
-            return TimeSlotProfile::create([
+            $profile = TimeSlotProfile::create([
                 'academic_year_id' => $data['academic_year_id'],
-                'name'             => $data['name'],
-                'description'      => $data['description'] ?? null,
-                'is_default'       => $isDefault,
+                'name'              => $data['name'],
+                'description'       => $data['description'] ?? null,
+                'is_default'        => $isDefault,
             ]);
+
+            return $profile->loadCount(['timeSlots', 'classes']);
         });
     }
 
@@ -80,12 +82,14 @@ class TimeSlotProfileService
 
             $profile->update([
                 'academic_year_id' => $data['academic_year_id'],
-                'name'             => $data['name'],
-                'description'      => $data['description'] ?? null,
-                'is_default'       => $isDefault,
+                'name'              => $data['name'],
+                'description'       => $data['description'] ?? null,
+                'is_default'        => $isDefault,
             ]);
 
-            return $profile->fresh(['academicYear', 'timeSlots', 'classes']);
+            // Sertakan loadCount agar classes_count tidak hilang saat memperbarui nama/deskripsi
+            return $profile->fresh(['academicYear', 'timeSlots', 'classes.grade', 'classes.major'])
+                ->loadCount(['timeSlots', 'classes']);
         });
     }
 
@@ -117,13 +121,25 @@ class TimeSlotProfileService
     public function assignToClasses(TimeSlotProfile $profile, array $classIds): array
     {
         return DB::transaction(function () use ($profile, $classIds) {
-            // Update kelas yang dipilih agar menggunakan profil ini
-            $affected = Classes::whereIn('id', $classIds)
-                ->update(['time_slot_profile_id' => $profile->id]);
+            // 1. Lepas keterikatan kelas yang sebelumnya terikat pada profil ini tetapi centangnya dihilangkan ($classIds)
+            Classes::where('time_slot_profile_id', $profile->id)
+                ->whereNotIn('id', $classIds)
+                ->update(['time_slot_profile_id' => null]);
+
+            // 2. Hubungkan kelas-kelas yang ada dalam daftar $classIds baru ke profil ini
+            $affected = 0;
+            if (!empty($classIds)) {
+                $affected = Classes::whereIn('id', $classIds)
+                    ->update(['time_slot_profile_id' => $profile->id]);
+            }
+
+            // Refreshed profile dengan data relasi & count kelas terbaru
+            $updatedProfile = $profile->fresh(['classes.grade', 'classes.major'])
+                ->loadCount(['timeSlots', 'classes']);
 
             return [
                 'assigned_count' => $affected,
-                'profile'        => $profile->load(['classes.grade', 'classes.major']),
+                'profile'         => $updatedProfile,
             ];
         });
     }
@@ -138,9 +154,9 @@ class TimeSlotProfileService
 
             $newProfile = TimeSlotProfile::create([
                 'academic_year_id' => $targetAcademicYearId,
-                'name'             => $newName ?: ($sourceProfile->name . ' (Salinan)'),
-                'description'      => $sourceProfile->description,
-                'is_default'       => false,
+                'name'              => $newName ?: ($sourceProfile->name . ' (Salinan)'),
+                'description'       => $sourceProfile->description,
+                'is_default'        => false,
             ]);
 
             foreach ($sourceProfile->timeSlots as $slot) {
@@ -154,7 +170,7 @@ class TimeSlotProfileService
                 ]);
             }
 
-            return $newProfile->load(['academicYear', 'timeSlots']);
+            return $newProfile->load(['academicYear', 'timeSlots'])->loadCount(['timeSlots', 'classes']);
         });
     }
 }
