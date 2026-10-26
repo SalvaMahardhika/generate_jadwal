@@ -23,15 +23,14 @@ class ClassSubjectSeeder extends Seeder
         $subjects = Subject::all()->keyBy('subject_code');
         $teachers = Teacher::all();
 
-        // Ambil Guru Spesialis & Tim Pengampu Serentak berdasarkan NIP
-        $pabpTeachers  = $teachers->whereIn('nip', ['198609202012011008'])->values(); // PABP & BTQ
+        // Ambil Guru Spesialis berdasarkan NIP
+        $pabpTeachers  = $teachers->whereIn('nip', ['198609202012011008'])->values(); // PABP
         $pjokTeachers  = $teachers->whereIn('nip', ['199104122016011007'])->values(); // PJOK
-        $bingTeachers  = $teachers->whereIn('nip', ['199406142020022009'])->values(); // B. Inggris / Seni
-        $bjawaTeachers = $teachers->whereIn('nip', ['199307222019022010'])->values(); // B. Jawa
+        $bingTeachers  = $teachers->whereIn('nip', ['199406142020022009'])->values(); // B. Inggris & Seni
+        $bjawaTeachers = $teachers->whereIn('nip', ['199307222019022010'])->values(); // Bahasa Jawa
         $aiTeachers    = $teachers->whereIn('nip', ['199510102022011011'])->values(); // Koding & AI
 
-        // Tim Utama Kokurikuler (Tim Tetap Lintas Kelas untuk Kegiatan Serentak)
-        // Contoh: Rina Utami (Seni/Inggris) & Sri Wahyuni (B. Jawa)
+        // Tim Utama Kokurikuler
         $kokurikulerLeadTeacher = $bingTeachers->first() ?? $teachers->first();
         $kokurikulerCoTeacher   = $bjawaTeachers->first() ?? $teachers->last();
 
@@ -39,29 +38,26 @@ class ClassSubjectSeeder extends Seeder
             $sequence = $class->grade?->sequence ?? 1;
 
             /**
-             * Distribusi Beban JP per Jenjang Kelas:
-             * - Kelas 1: PABP (3), PPKN (4), BINDO (6), MTK (4), PJOK (3), SRUP (3), BJAWA (2), BTQ (2), KOKURIKULER (5)
-             * - Kelas 2: PABP (3), PPKN (4), BINDO (7), MTK (5), PJOK (3), SRUP (3), BJAWA (2), BTQ (2), KOKURIKULER (5)
-             * - Kelas 3-4: + IPAS (5), BING (2)
-             * - Kelas 5-6: + Koding & AI (2)
+             * Pemetaan Beban JP yang Akurat Sesuai Jadwal Kurikulum Merdeka:
+             * Mulok diset khusus menggunakan kode BJAWA (Bahasa Jawa - 2 JP)
              */
             $subjectJpMap = match ($sequence) {
                 1 => [
-                    'PABP' => 3, 'PPKN' => 4, 'BINDO' => 6, 'MTK' => 4, 'IPAS' => 0,
-                    'PJOK' => 3, 'SRUP' => 3, 'BJAWA' => 2, 'BTQ' => 2, 'KOKURIKULER' => 5
+                    'UPACARA_LITNUM' => 6, 'PABP' => 3, 'PPKN' => 4, 'BINDO' => 6, 'MTK' => 4,
+                    'PJOK' => 3, 'SENI' => 4, 'BJAWA' => 2, 'KOKURIKULER' => 6
                 ],
                 2 => [
-                    'PABP' => 3, 'PPKN' => 4, 'BINDO' => 7, 'MTK' => 5, 'IPAS' => 0,
-                    'PJOK' => 3, 'SRUP' => 3, 'BJAWA' => 2, 'BTQ' => 2, 'KOKURIKULER' => 5
+                    'UPACARA_LITNUM' => 6, 'PABP' => 3, 'PPKN' => 4, 'BINDO' => 7, 'MTK' => 5,
+                    'PJOK' => 3, 'SENI' => 3, 'BJAWA' => 2, 'KOKURIKULER' => 6
                 ],
                 3, 4 => [
-                    'PABP' => 3, 'PPKN' => 4, 'BINDO' => 6, 'MTK' => 5, 'IPAS' => 5,
-                    'PJOK' => 3, 'SRUP' => 3, 'BING' => 2, 'BJAWA' => 2, 'BTQ' => 2, 'KOKURIKULER' => 5
+                    'UPACARA_LITNUM' => 6, 'PABP' => 3, 'PPKN' => 4, 'BINDO' => 6, 'MTK' => 5,
+                    'IPAS' => 5, 'PJOK' => 3, 'SENI' => 3, 'BING' => 2, 'BJAWA' => 2, 'KOKURIKULER' => 6
                 ],
                 5, 6 => [
-                    'PABP' => 3, 'PPKN' => 4, 'BINDO' => 6, 'MTK' => 5, 'IPAS' => 5,
-                    'PJOK' => 3, 'SRUP' => 3, 'BING' => 2, 'BJAWA' => 2, 'BTQ' => 2,
-                    'AI_KODING' => 2, 'KOKURIKULER' => 5
+                    'UPACARA_LITNUM' => 6, 'PABP' => 3, 'PPKN' => 4, 'BINDO' => 6, 'MTK' => 5,
+                    'IPAS' => 5, 'PJOK' => 3, 'SENI' => 3, 'BING' => 2, 'AI_KODING' => 2,
+                    'BJAWA' => 2, 'KOKURIKULER' => 6
                 ],
                 default => []
             };
@@ -78,17 +74,15 @@ class ClassSubjectSeeder extends Seeder
                     'class_id' => $class->id,
                     'subject_id' => $subject->id,
                     'total_jp' => $totalJp,
-                    'max_jp_per_day' => ($code === 'KOKURIKULER') ? 5 : 2,
+                    'max_jp_per_day' => ($code === 'KOKURIKULER' || $code === 'UPACARA_LITNUM') ? 6 : 3,
                     'status' => 'active',
                 ]);
 
-                // 2. Tentukan Alokasi Guru Pengampu & Skenario Team Teaching
+                // 2. Alokasi Guru Pengampu & Team Teaching
                 $homeroomTeacherId = $class->homeroom_teacher_id ?? $teachers->first()->id;
 
                 if ($code === 'KOKURIKULER') {
-                    // Skenario Team Teaching Kokurikuler (5 JP):
-                    // Menggunakan Tim Pengampu Tetap yang Sama di Seluruh Kelas
-                    // Guru Utama (3 JP) + Guru Pendamping (2 JP)
+                    // Team Teaching Kokurikuler (6 JP di Hari Sabtu)
                     ClassSubjectTeacher::create([
                         'class_subject_id' => $classSubject->id,
                         'teacher_id' => $kokurikulerLeadTeacher->id,
@@ -98,32 +92,17 @@ class ClassSubjectSeeder extends Seeder
                     ClassSubjectTeacher::create([
                         'class_subject_id' => $classSubject->id,
                         'teacher_id' => $kokurikulerCoTeacher->id,
-                        'jp' => 2,
-                    ]);
-                } elseif ($code === 'BINDO' && $sequence >= 3) {
-                    // Skenario Team Teaching Bahasa Indonesia Kelas Tinggi (6 JP) -> Wali Kelas (4 JP) + Guru B. Jawa (2 JP)
-                    $assistantTeacherId = $bjawaTeachers->first()?->id ?? $teachers->last()->id;
-
-                    ClassSubjectTeacher::create([
-                        'class_subject_id' => $classSubject->id,
-                        'teacher_id' => $homeroomTeacherId,
-                        'jp' => 4,
-                    ]);
-
-                    ClassSubjectTeacher::create([
-                        'class_subject_id' => $classSubject->id,
-                        'teacher_id' => $assistantTeacherId,
-                        'jp' => 2,
+                        'jp' => 3,
                     ]);
                 } else {
-                    // Single Teacher (Guru Tunggal) -> Mengajar seluruh total_jp mapel
+                    // Single Teacher (Guru Tunggal)
                     $assignedTeacherId = match ($code) {
-                        'PABP', 'BTQ' => $pabpTeachers->first()?->id ?? $homeroomTeacherId,
-                        'PJOK'        => $pjokTeachers->first()?->id ?? $homeroomTeacherId,
-                        'BING'        => $bingTeachers->first()?->id ?? $homeroomTeacherId,
-                        'BJAWA'       => $bjawaTeachers->first()?->id ?? $homeroomTeacherId,
-                        'AI_KODING'   => $aiTeachers->first()?->id ?? $homeroomTeacherId,
-                        default       => $homeroomTeacherId,
+                        'PABP'       => $pabpTeachers->first()?->id ?? $homeroomTeacherId,
+                        'PJOK'       => $pjokTeachers->first()?->id ?? $homeroomTeacherId,
+                        'BING'       => $bingTeachers->first()?->id ?? $homeroomTeacherId,
+                        'BJAWA'      => $bjawaTeachers->first()?->id ?? $homeroomTeacherId,
+                        'AI_KODING'  => $aiTeachers->first()?->id ?? $homeroomTeacherId,
+                        default      => $homeroomTeacherId,
                     };
 
                     ClassSubjectTeacher::create([

@@ -14,6 +14,7 @@ export const useSubjectStore = defineStore('subject', () => {
     search: '',
     category: '',
     status: '',
+    is_joint_subject: '',
   });
 
   const fetchSubjects = async () => {
@@ -101,6 +102,7 @@ export const useSubjectStore = defineStore('subject', () => {
     filters.search = '';
     filters.category = '';
     filters.status = '';
+    filters.is_joint_subject = '';
     fetchSubjects();
   };
 

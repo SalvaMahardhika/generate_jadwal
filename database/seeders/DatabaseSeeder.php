@@ -20,8 +20,9 @@ class DatabaseSeeder extends Seeder
 
         // Jalankan Seeder Berurutan Sesuai Dependensi Relasi DB
         $this->call([
-            TimeSlotSeeder::class,
             AcademicYearSeeder::class,
+            TimeSlotProfileSeeder::class, // Harus dipanggil sebelum TimeSlotSeeder & ClassSeeder
+            TimeSlotSeeder::class,
             GradeSeeder::class,
             MajorSeeder::class,
             TeacherSeeder::class,

@@ -16,6 +16,12 @@ class Subject extends Model
         'category',
         'passing_grade',
         'status',
+        'is_joint_subject',
+    ];
+
+    protected $casts = [
+        'is_joint_subject' => 'boolean',
+        'passing_grade'    => 'integer',
     ];
 
     public function classSubjects()

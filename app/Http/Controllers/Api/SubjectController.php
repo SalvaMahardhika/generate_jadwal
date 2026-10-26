@@ -22,7 +22,8 @@ class SubjectController extends Controller
         $subjects = $this->subjectService->getAll(
             $request->query('search'),
             $request->query('category'),
-            $request->query('status')
+            $request->query('status'),
+            $request->query('is_joint_subject')
         );
 
         return response()->json([

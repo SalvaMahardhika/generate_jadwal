@@ -5,9 +5,9 @@
     "scripts": {
         "build": "vite build",
         "dev": "vite",
-        "clean-ports": "npx --yes kill-port 5173 8000",
-        "serve": "php artisan serve --host=127.0.0.1 --no-reload",
-        "start": "npm run clean-ports && concurrently -k -p \"[{name}]\" -n \"VITE,LARAVEL\" -c \"bgMagenta.bold,bgBlue.bold\" \"npm run dev\" \"npm run serve\""
+        "clean": "npx --yes kill-port 5173 8000 && php artisan config:clear && php artisan view:clear",
+        "serve": "php artisan serve --host=127.0.0.1",
+        "start": "npm run clean && concurrently -k -p \"[{name}]\" -n \"VITE,LARAVEL\" -c \"bgMagenta.bold,bgBlue.bold\" \"npm run dev\" \"npm run serve\""
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",

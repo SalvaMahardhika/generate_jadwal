@@ -8,8 +8,12 @@ use Illuminate\Database\Eloquent\Collection;
 
 class SubjectService
 {
-    public function getAll(?string $search = null, ?string $category = null, ?string $status = null): Collection
-    {
+    public function getAll(
+        ?string $search = null,
+        ?string $category = null,
+        ?string $status = null,
+        mixed $isJointSubject = null
+    ): Collection {
         return Subject::query()
             ->when($search, function ($query, $search) {
                 $query->where('subject_name', 'like', "%{$search}%")
@@ -17,6 +21,9 @@ class SubjectService
             })
             ->when($category, fn($query) => $query->where('category', $category))
             ->when($status, fn($query) => $query->where('status', $status))
+            ->when(!is_null($isJointSubject) && $isJointSubject !== '', function ($query) use ($isJointSubject) {
+                $query->where('is_joint_subject', filter_var($isJointSubject, FILTER_VALIDATE_BOOLEAN));
+            })
             ->orderBy('subject_name', 'asc')
             ->get();
     }
