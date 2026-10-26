@@ -146,10 +146,10 @@ class ScheduleWizardController extends Controller
         try {
             $userId = $request->user()?->id ?? 1;
             $result = $this->generatorService->generate(
-                $request->input('academic_year_id'),
-                $request->input('class_id'),
+                (int) $request->input('academic_year_id'),
+                $request->input('class_id') ? (int) $request->input('class_id') : null,
                 $userId,
-                $request->input('max_period_number')
+                $request->input('max_period_number') ? (int) $request->input('max_period_number') : null
             );
 
             return response()->json([
@@ -231,9 +231,9 @@ class ScheduleWizardController extends Controller
         ]);
 
         $cleared = $this->generatorService->clearSlot(
-            $request->input('academic_year_id'),
-            $request->input('class_id'),
-            $request->input('time_slot_id'),
+            (int) $request->input('academic_year_id'),
+            (int) $request->input('class_id'),
+            (int) $request->input('time_slot_id'),
             (bool) $request->input('clear_all_classes', false)
         );
 
@@ -254,8 +254,8 @@ class ScheduleWizardController extends Controller
         ]);
 
         $affected = $this->generatorService->resetSchedule(
-            $request->input('academic_year_id'),
-            $request->input('class_id')
+            (int) $request->input('academic_year_id'),
+            $request->input('class_id') ? (int) $request->input('class_id') : null
         );
 
         return response()->json([
@@ -275,8 +275,8 @@ class ScheduleWizardController extends Controller
         ]);
 
         $affected = $this->generatorService->publish(
-            $request->input('academic_year_id'),
-            $request->input('class_id')
+            (int) $request->input('academic_year_id'),
+            $request->input('class_id') ? (int) $request->input('class_id') : null
         );
 
         return response()->json([
@@ -296,8 +296,8 @@ class ScheduleWizardController extends Controller
         ]);
 
         $affected = $this->generatorService->unpublish(
-            $request->input('academic_year_id'),
-            $request->input('class_id')
+            (int) $request->input('academic_year_id'),
+            $request->input('class_id') ? (int) $request->input('class_id') : null
         );
 
         return response()->json([

@@ -28,6 +28,7 @@ class GenerateScheduleRequest extends FormRequest
             'class_id.exists'          => 'Kelas tidak terdaftar.',
             'max_period_number.integer' => 'Maksimal JP harus berupa angka.',
             'max_period_number.min'     => 'Maksimal JP minimal 1.',
+            'max_period_number.max'     => 'Maksimal JP tidak boleh melebihi 15.',
         ];
     }
 }
