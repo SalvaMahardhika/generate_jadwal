@@ -70,11 +70,12 @@
       </div>
 
       <div v-else-if="wizardStore.viewMode === 'master'">
-        <MasterMatrixView 
-          :classes="wizardStore.masterMatrix?.classes || []"
+        <AllClassesMatrixView 
+          :classes="classesList"
           :timeSlots="wizardStore.timeSlots"
           :matrix="wizardStore.masterMatrix?.matrix || {}"
           :isLoading="wizardStore.isLoading"
+          @cellClick="openAssignModal"
         />
       </div>
 
@@ -101,7 +102,7 @@ import WizardHeader from './components/wizard/WizardHeader.vue';
 import JpBalanceSidebar from './components/wizard/JpBalanceSidebar.vue';
 import ClassMatrixView from './components/wizard/ClassMatrixView.vue';
 import TeacherMatrixView from './components/wizard/TeacherMatrixView.vue';
-import MasterMatrixView from './components/wizard/MasterMatrixView.vue';
+import AllClassesMatrixView from './components/wizard/AllClassesMatrixView.vue';
 import AssignSlotModal from './components/wizard/AssignSlotModal.vue';
 
 import { useWizardStore } from '../../stores/wizard';
@@ -120,8 +121,8 @@ const classSubjectsMap = ref<ClassSubjectTeacherDetail[]>([]);
 const showModal = ref(false);
 const activeSlot = ref<TimeSlot | null>(null);
 const activeSchedule = ref<ScheduleItem | null>(null);
+const activeClassId = ref<number | null>(null);
 
-// Flag untuk mencegah watcher terpicu berulang kali saat inisialisasi awal
 const isInitializing = ref(true);
 
 const availableClassSubjects = computed(() => classSubjectsMap.value);
@@ -191,7 +192,6 @@ const fetchClassSubjects = async (classId: number) => {
   }
 };
 
-// WATCHERS (Hanya berjalan setelah proses inisialisasi selesai)
 watch(() => wizardStore.viewMode, () => {
   if (isInitializing.value) return;
   wizardStore.refreshCurrentView();
@@ -217,7 +217,6 @@ watch(() => wizardStore.selectedTeacherId, (newId) => {
   }
 });
 
-// LIFECYCLE INITIALIZATION
 onMounted(async () => {
   isInitializing.value = true;
   
@@ -232,10 +231,16 @@ onMounted(async () => {
   isInitializing.value = false;
 });
 
-// MODAL & HANDLERS
-const openAssignModal = (payload: { slot: TimeSlot; schedule: ScheduleItem | null }) => {
+const openAssignModal = async (payload: { slot: TimeSlot; schedule: ScheduleItem | null; classId?: number }) => {
+  const targetClassId = payload.classId || wizardStore.selectedClassId;
+  activeClassId.value = targetClassId;
   activeSlot.value = payload.slot;
   activeSchedule.value = payload.schedule;
+
+  if (targetClassId) {
+    await fetchClassSubjects(targetClassId);
+  }
+
   showModal.value = true;
 };
 
@@ -245,11 +250,12 @@ const handleSaveSlot = async (data: {
   is_locked: boolean; 
   apply_to_all_classes: boolean 
 }) => {
-  if (!activeSlot.value || !wizardStore.selectedClassId || !wizardStore.selectedAcademicYearId) return;
+  const targetClassId = activeClassId.value || wizardStore.selectedClassId;
+  if (!activeSlot.value || !targetClassId || !wizardStore.selectedAcademicYearId) return;
 
   await wizardStore.manualAssign({
     academic_year_id: wizardStore.selectedAcademicYearId,
-    class_id: wizardStore.selectedClassId,
+    class_id: targetClassId,
     time_slot_id: activeSlot.value.id,
     class_subject_teacher_id: data.class_subject_teacher_id,
     custom_activity: data.custom_activity,
@@ -261,11 +267,12 @@ const handleSaveSlot = async (data: {
 };
 
 const handleClearSlot = async (payload?: { clear_all_classes?: boolean }) => {
-  if (!activeSlot.value || !wizardStore.selectedClassId || !wizardStore.selectedAcademicYearId) return;
+  const targetClassId = activeClassId.value || wizardStore.selectedClassId;
+  if (!activeSlot.value || !targetClassId || !wizardStore.selectedAcademicYearId) return;
 
   await wizardStore.clearSlot({
     academic_year_id: wizardStore.selectedAcademicYearId,
-    class_id: wizardStore.selectedClassId,
+    class_id: targetClassId,
     time_slot_id: activeSlot.value.id,
     clear_all_classes: payload?.clear_all_classes ?? false,
   });
@@ -273,7 +280,18 @@ const handleClearSlot = async (payload?: { clear_all_classes?: boolean }) => {
   showModal.value = false;
 };
 
-const handleGenerate = () => wizardStore.generateSchedule(wizardStore.selectedClassId);
-const handleReset = () => wizardStore.resetSchedule(wizardStore.selectedClassId);
-const handlePublish = () => wizardStore.publishSchedule(wizardStore.selectedClassId);
+const handleGenerate = () => {
+  const targetClassId = wizardStore.viewMode === 'master' ? null : wizardStore.selectedClassId;
+  wizardStore.generateSchedule(targetClassId);
+};
+
+const handleReset = () => {
+  const targetClassId = wizardStore.viewMode === 'master' ? null : wizardStore.selectedClassId;
+  wizardStore.resetSchedule(targetClassId);
+};
+
+const handlePublish = () => {
+  const targetClassId = wizardStore.viewMode === 'master' ? null : wizardStore.selectedClassId;
+  wizardStore.publishSchedule(targetClassId);
+};
 </script>

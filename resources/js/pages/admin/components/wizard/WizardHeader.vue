@@ -26,7 +26,7 @@
           :class="viewMode === 'master' ? 'btn-white text-primary shadow-sm' : 'text-secondary'"
           @click="emit('update:viewMode', 'master')"
         >
-          <i class="bi bi-diagram-3 me-1.5"></i> Matriks Master
+          <i class="bi bi-grid-3x3-gap-fill me-1.5"></i> Semua Kelas
         </button>
       </div>
 
@@ -81,7 +81,7 @@
           @click="emit('reset')"
           :disabled="isProcessing"
         >
-          <i class="bi bi-arrow-counterclockwise"></i> Reset
+          <i class="bi bi-arrow-counterclockwise"></i> Reset {{ viewMode === 'master' ? '(Semua)' : '' }}
         </button>
 
         <button 
@@ -91,7 +91,8 @@
           :disabled="isProcessing"
         >
           <span v-if="!isProcessing" class="d-flex align-items-center gap-1.5">
-            <i class="bi bi-lightning-charge-fill text-warning"></i> Auto-Generate
+            <i class="bi bi-lightning-charge-fill text-warning"></i> 
+            Auto-Generate {{ viewMode === 'master' ? '(Semua Kelas)' : '(Kelas Ini)' }}
           </span>
           <span v-else class="spinner-border spinner-border-sm" role="status"></span>
         </button>
@@ -102,7 +103,7 @@
           @click="emit('publish')"
           :disabled="isProcessing"
         >
-          <i class="bi bi-check2-circle"></i> Publish
+          <i class="bi bi-check2-circle"></i> Publish {{ viewMode === 'master' ? '(Semua)' : '' }}
         </button>
       </div>
 

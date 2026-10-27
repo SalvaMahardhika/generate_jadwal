@@ -3,9 +3,10 @@ import type { Subject } from './subject';
 
 export interface TimeSlot {
   id: number;
+  time_slot_profile_id?: number;
   day: 'senin' | 'selasa' | 'rabu' | 'kamis' | 'jumat' | 'sabtu';
   period_number: number;
-  label: string;
+  label?: string;
   start_time: string;
   end_time: string;
   is_break: boolean;
@@ -130,5 +131,6 @@ export interface GenerateResult {
     class_id: number;
     class_name: string;
     class_subject_id: number;
+    size?: number;
   }>;
 }
