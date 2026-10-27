@@ -27,7 +27,7 @@
             
             <!-- Navigasi Tipe Isian (Mapel vs Rutin) -->
             <ul class="nav nav-pills nav-fill bg-light p-1 rounded-3 mb-3">
-              <li class="nav-item">
+              <li class="nav-item" v-if="!isEditingRoutine">
                 <button 
                   type="button" 
                   class="nav-link py-1.5 px-3 fs-8 fw-semibold rounded-2 transition-all"
@@ -37,7 +37,7 @@
                   <i class="bi bi-journal-bookmark me-1"></i> Mata Pelajaran
                 </button>
               </li>
-              <li class="nav-item">
+              <li class="nav-item" v-if="!isEditingSubject">
                 <button 
                   type="button" 
                   class="nav-link py-1.5 px-3 fs-8 fw-semibold rounded-2 transition-all"
@@ -102,8 +102,8 @@
               </small>
             </div>
 
-            <!-- TOGGLE TERAPKAN UNTUK SEMUA KELAS -->
-            <div class="form-check form-switch p-2.5 bg-light rounded-3 border mb-2">
+            <!-- TOGGLE TERAPKAN UNTUK SEMUA KELAS (HANYA MUNCUL PADA KEGIATAN RUTIN) -->
+            <div v-if="slotType === 'routine'" class="form-check form-switch p-2.5 bg-light rounded-3 border mb-2">
               <input 
                 class="form-check-input shadow-none ms-0 me-2 cursor-pointer" 
                 type="checkbox" 
@@ -129,15 +129,16 @@
               <button 
                 type="button" 
                 class="btn btn-outline-danger rounded-3 py-1.5 px-3 small fw-medium shadow-none d-flex align-items-center gap-1"
-                @click="showClearMenu = !showClearMenu"
+                @click="slotType === 'routine' ? (showClearMenu = !showClearMenu) : handleClear(false)"
                 :disabled="isProcessing"
               >
                 <i class="bi bi-trash me-1"></i> Kosongkan Slot
-                <i class="bi bi-chevron-up fs-9 ms-1"></i>
+                <i v-if="slotType === 'routine'" class="bi bi-chevron-up fs-9 ms-1"></i>
               </button>
 
+              <!-- Dropdown Kosongkan Slot (Hanya untuk Kegiatan Rutin) -->
               <div 
-                v-if="showClearMenu" 
+                v-if="showClearMenu && slotType === 'routine'" 
                 class="position-absolute bottom-100 start-0 mb-1 bg-white border rounded-3 shadow-sm p-1" 
                 style="min-width: 180px; z-index: 1050;"
               >
@@ -214,23 +215,38 @@ const form = reactive({
   apply_to_all_classes: false,
 });
 
-// Kalkulasi kuota terpakai & batas maksimal per guru di UI secara presisi
+// Deteksi apakah slot yang diedit adalah Kegiatan Rutin
+const isEditingRoutine = computed(() => {
+  return !!(
+    props.currentSchedule &&
+    props.currentSchedule.custom_activity &&
+    props.currentSchedule.custom_activity.trim() !== ''
+  );
+});
+
+// Deteksi apakah slot yang diedit adalah Mata Pelajaran
+const isEditingSubject = computed(() => {
+  return !!(
+    props.currentSchedule &&
+    props.currentSchedule.class_subject_teacher_id !== null &&
+    props.currentSchedule.class_subject_teacher_id !== undefined &&
+    !isEditingRoutine.value
+  );
+});
+
 const availableSubjectsWithQuota = computed(() => {
   const currentSchedules = wizardStore.classMatrix?.schedules || {};
   const allScheduleValues = Object.values(currentSchedules);
 
   return props.availableSubjects.map((cst) => {
-    // Utamakan jatah JP individu guru (cst.jp). Jika bernilai null/undefined/0, baru fallback ke total_jp mapel.
     const maxJp = (cst.jp !== undefined && cst.jp !== null && Number(cst.jp) > 0)
       ? Number(cst.jp)
       : (cst.class_subject?.total_jp || 0);
 
-    // 1. Total slot terpasang untuk guru ini di seluruh matriks jadwal kelas aktif (untuk tampilan label)
     const totalAssignedJp = allScheduleValues.filter(
       (sched) => sched.class_subject_teacher_id === cst.id
     ).length;
 
-    // 2. Total slot terpasang DI LUAR slot aktif yang sedang dibuka (untuk pengecekan kuota penuh)
     const otherSlotsCount = allScheduleValues.filter(
       (sched) => sched.class_subject_teacher_id === cst.id && sched.time_slot_id !== props.timeSlot?.id
     ).length;
@@ -262,11 +278,12 @@ const switchSlotType = (type: 'subject' | 'routine') => {
 watch(() => props.show, (newVal) => {
   if (newVal) {
     showClearMenu.value = false;
-    if (props.currentSchedule?.custom_activity) {
+
+    if (isEditingRoutine.value) {
       slotType.value = 'routine';
-      form.custom_activity = props.currentSchedule.custom_activity;
+      form.custom_activity = props.currentSchedule?.custom_activity || '';
       form.class_subject_teacher_id = null;
-      form.is_locked = props.currentSchedule.is_locked ?? true;
+      form.is_locked = props.currentSchedule?.is_locked ?? true;
       form.apply_to_all_classes = true;
     } else {
       slotType.value = 'subject';
@@ -289,13 +306,14 @@ const handleSave = () => {
     class_subject_teacher_id: slotType.value === 'subject' ? form.class_subject_teacher_id : null,
     custom_activity: slotType.value === 'routine' ? (form.custom_activity.trim() || null) : null,
     is_locked: form.is_locked,
-    apply_to_all_classes: form.apply_to_all_classes,
+    apply_to_all_classes: slotType.value === 'routine' ? form.apply_to_all_classes : false,
   });
 };
 
 const handleClear = (clearAllClasses: boolean = false) => {
   showClearMenu.value = false;
-  emit('clear', { clear_all_classes: clearAllClasses });
+  const forceClearAll = slotType.value === 'subject' ? false : clearAllClasses;
+  emit('clear', { clear_all_classes: forceClearAll });
 };
 
 const capitalize = (str: string) => (str ? str.charAt(0).toUpperCase() + str.slice(1) : '');

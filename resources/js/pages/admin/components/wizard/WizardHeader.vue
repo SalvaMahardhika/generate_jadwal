@@ -2,8 +2,16 @@
   <div class="card border rounded-3 p-3 bg-white mb-4 shadow-sm">
     <div class="d-flex flex-column flex-xl-row align-items-xl-center justify-content-between gap-3">
       
-      <!-- MODE VIEW SWITCHER -->
+      <!-- MODE VIEW SWITCHER (URUTAN: Semua Kelas -> Per Kelas -> Per Guru) -->
       <div class="btn-group bg-light p-1 rounded-3 border" role="group">
+        <button 
+          type="button" 
+          class="btn btn-sm px-3 fw-semibold border-0 rounded-2"
+          :class="viewMode === 'master' ? 'btn-white text-primary shadow-sm' : 'text-secondary'"
+          @click="emit('update:viewMode', 'master')"
+        >
+          <i class="bi bi-grid-3x3-gap-fill me-1.5"></i> Semua Kelas
+        </button>
         <button 
           type="button" 
           class="btn btn-sm px-3 fw-semibold border-0 rounded-2"
@@ -19,14 +27,6 @@
           @click="emit('update:viewMode', 'teacher')"
         >
           <i class="bi bi-person-badge me-1.5"></i> Per Guru
-        </button>
-        <button 
-          type="button" 
-          class="btn btn-sm px-3 fw-semibold border-0 rounded-2"
-          :class="viewMode === 'master' ? 'btn-white text-primary shadow-sm' : 'text-secondary'"
-          @click="emit('update:viewMode', 'master')"
-        >
-          <i class="bi bi-grid-3x3-gap-fill me-1.5"></i> Semua Kelas
         </button>
       </div>
 
