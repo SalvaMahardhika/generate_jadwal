@@ -157,7 +157,7 @@ class ScheduleGeneratorService
             $q->where('teacher_id', $teacherId);
         })
         ->get()
-        ->keyBy('time_slot_id');
+        ->keyBy('id'); // Diubah dari keyBy('time_slot_id') ke keyBy('id') agar tidak saling menimpa jika mengajar lintas kelas
 
         return [
             'teacher'           => $teacher,

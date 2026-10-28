@@ -67,7 +67,7 @@ export interface ClassMatrixData {
 export interface TeacherMatrixData {
   teacher: TeacherOption;
   time_slots: TimeSlot[];
-  schedules: Record<number, ScheduleItem>; // Key by time_slot_id
+  schedules: Record<number, ScheduleItem>; // Key by schedule id
   total_assigned_jp: number;
 }
 

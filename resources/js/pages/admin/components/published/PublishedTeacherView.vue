@@ -128,7 +128,7 @@ const props = defineProps<{
   teacherName?: string;
   totalAssignedJp: number;
   timeSlots: TimeSlot[];
-  schedules: Record<number, ScheduleItem>;
+  schedules: Record<number, ScheduleItem> | ScheduleItem[];
   isLoading: boolean;
 }>();
 
@@ -156,14 +156,17 @@ const getTileStyle = (colorCode?: string | null) => {
   };
 };
 
-// Pengelompokan agenda harian guru (Murni menyaring status === 'published')
+// Pengelompokan agenda harian guru (Menyaring status === 'published' secara aman)
 const getDailyAgenda = (day: string): DailyAgendaItem[] => {
   if (!props.schedules) return [];
-  const scheduleList = Object.values(props.schedules);
+  const scheduleList = Array.isArray(props.schedules)
+    ? props.schedules
+    : Object.values(props.schedules);
 
-  // Filter jadwal sesuai hari dan status published
+  // Filter jadwal sesuai hari dan status published jika ada
   const matchingSchedules = scheduleList.filter(sched => {
-    if (!sched || sched.status !== 'published') return false;
+    if (!sched) return false;
+    if (sched.status && sched.status !== 'published') return false;
     const slot = sched.time_slot || (props.timeSlots || []).find(s => s.id === sched.time_slot_id);
     if (!slot) return false;
     return slot.day.toLowerCase() === day.toLowerCase() && !slot.is_break;
@@ -228,9 +231,12 @@ const getDailyAgenda = (day: string): DailyAgendaItem[] => {
 // Legenda Mata Pelajaran dan Kelas yang Diampu
 const legendItems = computed(() => {
   const map = new Map<string, { colorHex: string; subjectName: string; className: string; jpCount: number }>();
+  const scheduleList = Array.isArray(props.schedules)
+    ? props.schedules
+    : Object.values(props.schedules || {});
 
-  Object.values(props.schedules || {}).forEach((sched) => {
-    if (sched && sched.status === 'published' && sched.class_subject_teacher) {
+  scheduleList.forEach((sched) => {
+    if (sched && (!sched.status || sched.status === 'published') && sched.class_subject_teacher) {
       const cst = sched.class_subject_teacher;
       const subjName = cst.class_subject?.subject?.subject_name || '-';
       const className = sched.class?.class_name || '-';

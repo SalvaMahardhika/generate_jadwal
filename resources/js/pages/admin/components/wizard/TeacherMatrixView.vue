@@ -107,7 +107,7 @@ const props = defineProps<{
   teacherName?: string;
   totalAssignedJp: number;
   timeSlots: TimeSlot[];
-  schedules: Record<number, ScheduleItem>;
+  schedules: Record<number, ScheduleItem> | ScheduleItem[];
   isLoading: boolean;
 }>();
 
@@ -116,10 +116,13 @@ const days = ['senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu'];
 // Ambil dan kelompokkan agenda per Hari berdasarkan Jam ke-N & Mapel
 const getDailyAgenda = (day: string): DailyAgendaItem[] => {
   if (!props.schedules) return [];
-  const scheduleList = Object.values(props.schedules);
+  const scheduleList = Array.isArray(props.schedules) 
+    ? props.schedules 
+    : Object.values(props.schedules);
 
   // Filter jadwal sesuai hari
   const matchingSchedules = scheduleList.filter(sched => {
+    if (!sched) return false;
     const slot = sched.time_slot || (props.timeSlots || []).find(s => s.id === sched.time_slot_id);
     if (!slot) return false;
     return slot.day.toLowerCase() === day.toLowerCase() && !slot.is_break;
