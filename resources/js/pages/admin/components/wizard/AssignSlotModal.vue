@@ -234,22 +234,46 @@ const isEditingSubject = computed(() => {
   );
 });
 
+// Perhitungan Kuota Saldo JP yang presisi dan realtime mencakup mode Semua Kelas & Per Kelas
 const availableSubjectsWithQuota = computed(() => {
-  const currentSchedules = wizardStore.classMatrix?.schedules || {};
-  const allScheduleValues = Object.values(currentSchedules);
+  let allScheduleValues: ScheduleItem[] = [];
+
+  const storeAny = wizardStore as any;
+  if (storeAny.schedules && typeof storeAny.schedules === 'object' && Object.keys(storeAny.schedules).length > 0) {
+    allScheduleValues = Object.values(storeAny.schedules);
+  } else if (wizardStore.classMatrix?.schedules) {
+    allScheduleValues = Object.values(wizardStore.classMatrix.schedules);
+  } else if (wizardStore.masterMatrix?.matrix) {
+    // Flatten struktur matrix [class_id][time_slot_id] menjadi array ScheduleItem[]
+    Object.values(wizardStore.masterMatrix.matrix).forEach((classSlots) => {
+      if (classSlots && typeof classSlots === 'object') {
+        Object.values(classSlots).forEach((sched) => {
+          if (sched) allScheduleValues.push(sched as ScheduleItem);
+        });
+      }
+    });
+  }
+
+  // Tentukan ID kelas target dari slot yang sedang dipilih/diedit
+  const targetClassId = props.currentSchedule?.class_id || wizardStore.selectedClassId;
 
   return props.availableSubjects.map((cst) => {
     const maxJp = (cst.jp !== undefined && cst.jp !== null && Number(cst.jp) > 0)
       ? Number(cst.jp)
       : (cst.class_subject?.total_jp || 0);
 
-    const totalAssignedJp = allScheduleValues.filter(
-      (sched) => sched.class_subject_teacher_id === cst.id
-    ).length;
+    const totalAssignedJp = allScheduleValues.filter((sched) => {
+      const isSameTeacher = sched.class_subject_teacher_id === cst.id;
+      const isSameClass = targetClassId ? Number(sched.class_id) === Number(targetClassId) : true;
+      return isSameTeacher && isSameClass;
+    }).length;
 
-    const otherSlotsCount = allScheduleValues.filter(
-      (sched) => sched.class_subject_teacher_id === cst.id && sched.time_slot_id !== props.timeSlot?.id
-    ).length;
+    const otherSlotsCount = allScheduleValues.filter((sched) => {
+      const isSameTeacher = sched.class_subject_teacher_id === cst.id;
+      const isSameClass = targetClassId ? Number(sched.class_id) === Number(targetClassId) : true;
+      const isDifferentSlot = sched.time_slot_id !== props.timeSlot?.id;
+      return isSameTeacher && isSameClass && isDifferentSlot;
+    }).length;
 
     const isFull = otherSlotsCount >= maxJp;
 
