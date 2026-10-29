@@ -26,7 +26,7 @@ export default defineConfig({
     server: {
         host: '127.0.0.1',
         port: 5173,
-        strictPort: true, // Mencegah Vite diam-diam pindah ke port 5174 jika port 5173 masih terunci
+        strictPort: false, // Memungkinkan pemulihan port otomatis jika terikat sementara oleh OS
         hmr: {
             host: '127.0.0.1', // Memaksa koneksi WebSocket HMR langsung terikat ke IPv4
         },

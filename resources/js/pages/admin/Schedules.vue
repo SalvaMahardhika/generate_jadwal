@@ -5,7 +5,7 @@
       <!-- HEADER HALAMAN -->
       <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4 pb-2 border-bottom print-hide">
         <div>
-          <h5 class="fw-bold text-dark mb-1">Master Jadwal Pelajaran Resmi</h5>
+          <h5 class="fw-bold text-dark mb-1">Jadwal Pelajaran Resmi</h5>
           <p class="text-secondary small mb-0">Lihat, unduh Excel, dan kelola publikasi jadwal pelajaran yang telah difinalisasi.</p>
         </div>
 
