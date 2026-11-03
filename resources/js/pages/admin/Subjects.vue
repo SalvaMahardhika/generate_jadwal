@@ -8,14 +8,52 @@
           <h5 class="fw-bold text-dark mb-1">Mata Pelajaran</h5>
           <p class="text-secondary small mb-0">Kelola master kode mapel, nama, KKM, warna label, indikator paralel, dan kategori mata pelajaran.</p>
         </div>
-        <button 
-          type="button" 
-          class="btn btn-primary rounded-3 py-2 px-3 small fw-medium d-flex align-items-center gap-2"
-          @click="openCreateModal"
-        >
-          <i class="bi bi-plus-lg"></i>
-          <span>Tambah Mapel</span>
-        </button>
+
+        <div class="d-flex align-items-center gap-2">
+          <!-- Dropdown Aksi Excel (Export / Download Template / Import) -->
+          <div class="dropdown">
+            <button
+              class="btn btn-outline-success rounded-3 py-2 px-3 small fw-medium dropdown-toggle d-flex align-items-center gap-2 shadow-none"
+              type="button"
+              data-bs-toggle="dropdown"
+              aria-expanded="false"
+            >
+              <i class="bi bi-file-earmark-excel"></i>
+              <span>Excel</span>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 rounded-3 text-start fs-8">
+              <li>
+                <button class="dropdown-item py-2 px-3 d-flex align-items-center gap-2" type="button" @click="handleDownloadTemplate">
+                  <i class="bi bi-download text-muted"></i>
+                  <span>Download Template Import</span>
+                </button>
+              </li>
+              <li>
+                <button class="dropdown-item py-2 px-3 d-flex align-items-center gap-2" type="button" @click="handleExportData">
+                  <i class="bi bi-file-earmark-arrow-down text-muted"></i>
+                  <span>Export Data Mapel</span>
+                </button>
+              </li>
+              <li><hr class="dropdown-divider my-1"></li>
+              <li>
+                <button class="dropdown-item py-2 px-3 d-flex align-items-center gap-2 text-success fw-medium" type="button" @click="openImportModal">
+                  <i class="bi bi-file-earmark-arrow-up"></i>
+                  <span>Impor dari Excel</span>
+                </button>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Tombol Tambah Mapel Manual -->
+          <button 
+            type="button" 
+            class="btn btn-primary rounded-3 py-2 px-3 small fw-medium d-flex align-items-center gap-2"
+            @click="openCreateModal"
+          >
+            <i class="bi bi-plus-lg"></i>
+            <span>Tambah Mapel</span>
+          </button>
+        </div>
       </div>
 
       <!-- Alert Pesan Sukses -->
@@ -56,6 +94,16 @@
       :errors="formErrors"
       @close="showFormModal = false"
       @submit="submitForm"
+      @openImport="openImportModal"
+    />
+
+    <!-- Modal Import Excel -->
+    <SubjectImportModal
+      :show="showImportModal"
+      :isSaving="subjectStore.isSaving"
+      :existingSubjects="subjectStore.subjects"
+      @close="showImportModal = false"
+      @importSuccess="handleImportSuccess"
     />
 
     <!-- Modal Delete -->
@@ -78,14 +126,18 @@ import SubjectFilterBar from './components/subject/SubjectFilterBar.vue';
 import SubjectTable from './components/subject/SubjectTable.vue';
 import SubjectFormModal from './components/subject/SubjectFormModal.vue';
 import SubjectDeleteModal from './components/subject/SubjectDeleteModal.vue';
+import SubjectImportModal from './components/subject/SubjectImportModal.vue';
 
 import { useSubjectStore } from '../../stores/subject';
+import { exportSubjectExcel } from '../../utils/subjectExcelExporter';
 import type { Subject, SubjectPayload } from '../../types/subject';
 
 const subjectStore = useSubjectStore();
 
 const showFormModal = ref(false);
 const showDeleteModal = ref(false);
+const showImportModal = ref(false);
+
 const isEditing = ref(false);
 const selectedSubject = ref<Subject | null>(null);
 const deleteErrorMessage = ref<string | null>(null);
@@ -119,6 +171,27 @@ const handleStatusUpdate = (val: string) => {
 const handleJointSubjectUpdate = (val: string) => {
   subjectStore.filters.is_joint_subject = val;
   subjectStore.fetchSubjects();
+};
+
+// Excel Aksi
+const handleDownloadTemplate = () => {
+  exportSubjectExcel([], true);
+};
+
+const handleExportData = () => {
+  exportSubjectExcel(subjectStore.subjects, false);
+};
+
+const openImportModal = () => {
+  showFormModal.value = false;
+  showImportModal.value = true;
+};
+
+const handleImportSuccess = async (payloads: SubjectPayload[]) => {
+  const result = await subjectStore.importSubjects(payloads);
+  if (result.success) {
+    showImportModal.value = false;
+  }
 };
 
 const openCreateModal = () => {
@@ -171,3 +244,9 @@ const confirmDelete = async () => {
   }
 };
 </script>
+
+<style scoped>
+.fs-8 {
+  font-size: 0.75rem;
+}
+</style>

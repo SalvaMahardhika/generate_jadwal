@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Subject\ImportSubjectRequest;
 use App\Http\Requests\Subject\StoreSubjectRequest;
 use App\Http\Requests\Subject\UpdateSubjectRequest;
 use App\Models\Subject;
@@ -76,6 +77,27 @@ class SubjectController extends Controller
                 'status' => 'error',
                 'message' => $e->getMessage(),
             ], $e->getCode() ?: 500);
+        }
+    }
+
+    /**
+     * Impor data mata pelajaran massal dari berkas Excel.
+     */
+    public function import(ImportSubjectRequest $request): JsonResponse
+    {
+        try {
+            $imported = $this->subjectService->import($request->validated()['subjects']);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => count($imported) . ' data mata pelajaran berhasil diimpor.',
+                'data' => $imported,
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gagal mengimpor data mata pelajaran: ' . $e->getMessage(),
+            ], 500);
         }
     }
 }

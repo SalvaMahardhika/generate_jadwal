@@ -27,3 +27,7 @@ export interface SubjectFilter {
   status?: string;
   is_joint_subject?: string;
 }
+
+export interface ImportSubjectPayload {
+  subjects: SubjectPayload[];
+}

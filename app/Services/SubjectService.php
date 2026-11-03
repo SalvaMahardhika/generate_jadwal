@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Subject;
 use Exception;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 
 class SubjectService
 {
@@ -46,5 +47,45 @@ class SubjectService
         }
 
         return $subject->delete();
+    }
+
+    /**
+     * Impor massal data mata pelajaran (Hanya insert mapel baru, mapel lama dilewati).
+     */
+    public function import(array $subjectsData): Collection
+    {
+        $defaultColors = [
+            '#2563EB', '#D97706', '#059669', '#DC2626', '#7C3AED', 
+            '#DB2777', '#0284C7', '#4D7C0F', '#475569', '#9333EA',
+            '#0891B2', '#CA8A04'
+        ];
+
+        return DB::transaction(function () use ($subjectsData, $defaultColors) {
+            $imported = new Collection();
+
+            foreach ($subjectsData as $index => $data) {
+                $code = strtoupper(trim($data['subject_code']));
+
+                // Gunakan firstOrCreate agar jika mapel sudah ada, data lama TIDAK tertimpa/di-overwrite
+                $subject = Subject::firstOrCreate(
+                    ['subject_code' => $code],
+                    [
+                        'subject_name' => trim($data['subject_name']),
+                        'category' => $data['category'] ?? 'wajib',
+                        'passing_grade' => $data['passing_grade'] ?? 75,
+                        'color_code' => $data['color_code'] ?? $defaultColors[$index % count($defaultColors)],
+                        'status' => $data['status'] ?? 'active',
+                        'is_joint_subject' => filter_var($data['is_joint_subject'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                    ]
+                );
+
+                // Hanya masukkan ke daftar koleksi respon jika data baru dibuat
+                if ($subject->wasRecentlyCreated) {
+                    $imported->push($subject);
+                }
+            }
+
+            return $imported;
+        });
     }
 }

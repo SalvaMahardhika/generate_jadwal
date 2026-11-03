@@ -5,9 +5,24 @@
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-sm rounded-4 overflow-hidden bg-white">
           
-          <div class="modal-header border-bottom px-4 py-3">
+          <div class="modal-header border-bottom px-4 py-3 d-flex align-items-center justify-content-between">
             <h6 class="modal-title fw-bold text-dark">{{ isEditing ? 'Edit Mata Pelajaran' : 'Tambah Mapel Baru' }}</h6>
-            <button type="button" class="btn-close small shadow-none" @click="closeModal" :disabled="isSaving"></button>
+            
+            <div class="d-flex align-items-center gap-2">
+              <!-- Tombol Alih ke Modal Impor Excel (Khusus Mode Tambah Mapel) -->
+              <button 
+                v-if="!isEditing"
+                type="button" 
+                class="btn btn-sm btn-outline-success border-0 bg-success-subtle text-success fs-8 fw-medium py-1 px-2.5 rounded-2 d-flex align-items-center gap-1 shadow-none"
+                @click="emit('openImport')"
+                :disabled="isSaving"
+                title="Impor massal data dari berkas Excel"
+              >
+                <i class="bi bi-file-earmark-excel"></i> Impor Excel
+              </button>
+
+              <button type="button" class="btn-close small shadow-none" @click="closeModal" :disabled="isSaving"></button>
+            </div>
           </div>
 
           <form @submit.prevent="handleSubmit">
@@ -170,7 +185,7 @@ const props = defineProps<{
   errors: Record<string, string[]>;
 }>();
 
-const emit = defineEmits(['close', 'submit']);
+const emit = defineEmits(['close', 'submit', 'openImport']);
 
 const form = reactive<SubjectPayload>({
   subject_code: '',
@@ -229,5 +244,9 @@ const handleSubmit = () => {
 }
 .cursor-pointer {
   cursor: pointer;
+}
+.bg-success-subtle {
+  background-color: #f0fdf4 !important;
+  color: #16a34a !important;
 }
 </style>

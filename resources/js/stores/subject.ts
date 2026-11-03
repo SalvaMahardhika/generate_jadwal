@@ -98,6 +98,28 @@ export const useSubjectStore = defineStore('subject', () => {
     }
   };
 
+  const importSubjects = async (subjectsPayload: SubjectPayload[]) => {
+    isSaving.value = true;
+    errorMessage.value = null;
+    successMessage.value = null;
+
+    try {
+      const response = await SubjectService.import(subjectsPayload);
+      if (response.status === 'success') {
+        successMessage.value = response.message || 'Data mata pelajaran berhasil diimpor.';
+        await fetchSubjects();
+        return { success: true };
+      }
+      return { success: false, message: response.message };
+    } catch (error: any) {
+      const msg = error.response?.data?.message || 'Gagal mengimpor data mata pelajaran.';
+      errorMessage.value = msg;
+      return { success: false, message: msg, errors: error.response?.data?.errors };
+    } finally {
+      isSaving.value = false;
+    }
+  };
+
   const resetFilters = () => {
     filters.search = '';
     filters.category = '';
@@ -117,6 +139,7 @@ export const useSubjectStore = defineStore('subject', () => {
     createSubject,
     updateSubject,
     deleteSubject,
+    importSubjects,
     resetFilters,
   };
 });

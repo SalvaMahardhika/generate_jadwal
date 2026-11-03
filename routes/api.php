@@ -82,6 +82,7 @@ Route::prefix('v1')->group(function () {
     Route::prefix('subjects')->group(function () {
         Route::get('/', [SubjectController::class, 'index']);
         Route::post('/', [SubjectController::class, 'store']);
+        Route::post('/import', [SubjectController::class, 'import']); // Endpoint Impor Excel
         Route::get('/{subject}', [SubjectController::class, 'show']);
         Route::put('/{subject}', [SubjectController::class, 'update']);
         Route::delete('/{subject}', [SubjectController::class, 'destroy']);
