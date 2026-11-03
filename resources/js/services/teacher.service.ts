@@ -1,5 +1,5 @@
 import api from './api';
-import type { Teacher, TeacherPayload, TeacherFilter } from '../types/teacher';
+import type { Teacher, TeacherPayload, TeacherFilter, ImportTeacherPayload } from '../types/teacher';
 import type { ApiResponse } from '../types/auth';
 
 export const TeacherService = {
@@ -25,6 +25,11 @@ export const TeacherService = {
 
   async delete(id: number): Promise<ApiResponse<null>> {
     const response = await api.delete<ApiResponse<null>>(`/teachers/${id}`);
+    return response.data;
+  },
+
+  async import(teachers: TeacherPayload[]): Promise<ApiResponse<Teacher[]>> {
+    const response = await api.post<ApiResponse<Teacher[]>>('/teachers/import', { teachers } as ImportTeacherPayload);
     return response.data;
   },
 };

@@ -21,3 +21,7 @@ export interface TeacherFilter {
   search?: string;
   status?: string;
 }
+
+export interface ImportTeacherPayload {
+  teachers: TeacherPayload[];
+}

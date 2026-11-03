@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Teacher\ImportTeacherRequest;
 use App\Http\Requests\Teacher\StoreTeacherRequest;
 use App\Http\Requests\Teacher\UpdateTeacherRequest;
 use App\Models\Teacher;
@@ -74,6 +75,27 @@ class TeacherController extends Controller
                 'status' => 'error',
                 'message' => $e->getMessage(),
             ], $e->getCode() ?: 500);
+        }
+    }
+
+    /**
+     * Impor massal data guru dari berkas Excel.
+     */
+    public function import(ImportTeacherRequest $request): JsonResponse
+    {
+        try {
+            $imported = $this->teacherService->import($request->validated()['teachers']);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => count($imported) . ' data guru baru berhasil diimpor.',
+                'data' => $imported,
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gagal mengimpor data guru: ' . $e->getMessage(),
+            ], 500);
         }
     }
 }

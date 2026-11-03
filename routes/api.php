@@ -73,6 +73,7 @@ Route::prefix('v1')->group(function () {
     Route::prefix('teachers')->group(function () {
         Route::get('/', [TeacherController::class, 'index']);
         Route::post('/', [TeacherController::class, 'store']);
+        Route::post('/import', [TeacherController::class, 'import']); // Endpoint Impor Excel Guru
         Route::get('/{teacher}', [TeacherController::class, 'show']);
         Route::put('/{teacher}', [TeacherController::class, 'update']);
         Route::delete('/{teacher}', [TeacherController::class, 'destroy']);

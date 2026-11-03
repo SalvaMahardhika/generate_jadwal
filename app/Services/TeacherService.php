@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Teacher;
 use Exception;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 
 class TeacherService
 {
@@ -33,7 +34,7 @@ class TeacherService
 
     public function delete(Teacher $teacher): bool
     {
-        // Proteksi jika guru menjadi wali kelas atau di-assign mengajar mapel[cite: 4, 5]
+        // Proteksi jika guru menjadi wali kelas atau di-assign mengajar mapel
         if ($teacher->homeroomClasses()->exists()) {
             throw new Exception('Tidak dapat menghapus guru yang sedang bertugas sebagai wali kelas.', 422);
         }
@@ -43,5 +44,47 @@ class TeacherService
         }
 
         return $teacher->delete();
+    }
+
+    /**
+     * Impor massal data guru (Hanya insert guru baru, jika NIP sudah ada maka dilewati).
+     */
+    public function import(array $teachersData): Collection
+    {
+        return DB::transaction(function () use ($teachersData) {
+            $imported = new Collection();
+
+            foreach ($teachersData as $data) {
+                $nip = !empty($data['nip']) ? trim($data['nip']) : null;
+
+                if ($nip) {
+                    $teacher = Teacher::firstOrCreate(
+                        ['nip' => $nip],
+                        [
+                            'name' => trim($data['name']),
+                            'gender' => $data['gender'] ?? 'L',
+                            'max_jp_per_week' => $data['max_jp_per_week'] ?? 24,
+                            'status' => $data['status'] ?? 'active',
+                        ]
+                    );
+
+                    if ($teacher->wasRecentlyCreated) {
+                        $imported->push($teacher);
+                    }
+                } else {
+                    $teacher = Teacher::create([
+                        'nip' => null,
+                        'name' => trim($data['name']),
+                        'gender' => $data['gender'] ?? 'L',
+                        'max_jp_per_week' => $data['max_jp_per_week'] ?? 24,
+                        'status' => $data['status'] ?? 'active',
+                    ]);
+
+                    $imported->push($teacher);
+                }
+            }
+
+            return $imported;
+        });
     }
 }

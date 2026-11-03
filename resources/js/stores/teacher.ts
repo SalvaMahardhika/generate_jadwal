@@ -96,6 +96,28 @@ export const useTeacherStore = defineStore('teacher', () => {
     }
   };
 
+  const importTeachers = async (teachersPayload: TeacherPayload[]) => {
+    isSaving.value = true;
+    errorMessage.value = null;
+    successMessage.value = null;
+
+    try {
+      const response = await TeacherService.import(teachersPayload);
+      if (response.status === 'success') {
+        successMessage.value = response.message || 'Data guru berhasil diimpor.';
+        await fetchTeachers();
+        return { success: true };
+      }
+      return { success: false, message: response.message };
+    } catch (error: any) {
+      const msg = error.response?.data?.message || 'Gagal mengimpor data guru.';
+      errorMessage.value = msg;
+      return { success: false, message: msg, errors: error.response?.data?.errors };
+    } finally {
+      isSaving.value = false;
+    }
+  };
+
   const resetFilters = () => {
     filters.search = '';
     filters.status = '';
@@ -113,6 +135,7 @@ export const useTeacherStore = defineStore('teacher', () => {
     createTeacher,
     updateTeacher,
     deleteTeacher,
+    importTeachers,
     resetFilters,
   };
 });
