@@ -100,6 +100,7 @@ export interface ManualAssignPayload {
   custom_activity?: string | null;
   is_locked?: boolean;
   apply_to_all_classes?: boolean;
+  apply_to_all_profiles?: boolean;
 }
 
 export interface ClearSlotPayload {
@@ -107,6 +108,7 @@ export interface ClearSlotPayload {
   class_id: number;
   time_slot_id: number;
   clear_all_classes?: boolean;
+  clear_all_profiles?: boolean;
 }
 
 export interface ResetSchedulePayload {

@@ -200,7 +200,14 @@ class ScheduleWizardController extends Controller
     {
         try {
             $userId   = $request->user()?->id ?? 1;
-            $schedule = $this->generatorService->manualAssign($request->validated(), $userId);
+            $payload  = $request->validated();
+            
+            // Kompatibilitas mundur: dukung opsi apply_to_all_profiles maupun apply_to_all_classes
+            if (isset($payload['apply_to_all_profiles']) && !isset($payload['apply_to_all_classes'])) {
+                $payload['apply_to_all_classes'] = $payload['apply_to_all_profiles'];
+            }
+
+            $schedule = $this->generatorService->manualAssign($payload, $userId);
 
             return response()->json([
                 'status'  => 'success',
@@ -224,17 +231,20 @@ class ScheduleWizardController extends Controller
     public function clearSlot(Request $request): JsonResponse
     {
         $request->validate([
-            'academic_year_id'  => ['required', 'exists:academic_years,id'],
-            'class_id'          => ['required', 'exists:classes,id'],
-            'time_slot_id'      => ['required', 'exists:time_slots,id'],
-            'clear_all_classes' => ['nullable', 'boolean'],
+            'academic_year_id'      => ['required', 'exists:academic_years,id'],
+            'class_id'              => ['required', 'exists:classes,id'],
+            'time_slot_id'          => ['required', 'exists:time_slots,id'],
+            'clear_all_classes'     => ['nullable', 'boolean'],
+            'clear_all_profiles'    => ['nullable', 'boolean'],
         ]);
+
+        $clearAll = (bool) ($request->input('clear_all_profiles') ?? $request->input('clear_all_classes', false));
 
         $cleared = $this->generatorService->clearSlot(
             (int) $request->input('academic_year_id'),
             (int) $request->input('class_id'),
             (int) $request->input('time_slot_id'),
-            (bool) $request->input('clear_all_classes', false)
+            $clearAll
         );
 
         return response()->json([

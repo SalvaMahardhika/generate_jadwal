@@ -10,7 +10,7 @@
             <div>
               <h6 class="modal-title fw-bold text-dark mb-0">Atur Slot Jadwal</h6>
               <small class="text-muted fs-8" v-if="timeSlot">
-                {{ capitalize(timeSlot.day) }} - Jam ke-{{ timeSlot.period_number }} 
+                {{ capitalize(timeSlot.day) }} • Jam ke-{{ timeSlot.period_number }} 
                 ({{ formatTime(timeSlot.start_time) }} - {{ formatTime(timeSlot.end_time) }})
               </small>
             </div>
@@ -44,7 +44,7 @@
                   :class="{ 'active bg-white text-primary shadow-sm': slotType === 'routine' }"
                   @click="switchSlotType('routine')"
                 >
-                  <i class="bi bi-flag me-1"></i> Kegiatan Rutin / Non-Mapel
+                  <i class="bi bi-flag me-1"></i> Kegiatan Rutin / Non-KBM
                 </button>
               </li>
             </ul>
@@ -52,7 +52,7 @@
             <!-- OPSI A: MATA PELAJARAN -->
             <div v-if="slotType === 'subject'">
               <div class="mb-3">
-                <label class="form-label fw-medium text-dark small">Pilih Mapel & Guru Pengampu <span class="text-danger">*</span></label>
+                <label class="form-label fw-medium text-dark small">Mata Pelajaran & Guru Pengampu <span class="text-danger">*</span></label>
                 <select 
                   class="form-select form-select-sm rounded-3 shadow-none border-secondary-subtle"
                   v-model="form.class_subject_teacher_id"
@@ -64,9 +64,9 @@
                     :value="cst.id"
                     :disabled="cst.isFull && cst.id !== currentSchedule?.class_subject_teacher_id"
                   >
-                    {{ cst.subjectName }} - {{ cst.teacherName }} 
+                    {{ cst.subjectName }} — {{ cst.teacherName }} 
                     ({{ cst.assignedJp }}/{{ cst.maxJp }} JP) 
-                    <template v-if="cst.isFull && cst.id !== currentSchedule?.class_subject_teacher_id">[PENUH]</template>
+                    <template v-if="cst.isFull && cst.id !== currentSchedule?.class_subject_teacher_id">[KUOTA PENUH]</template>
                   </option>
                 </select>
               </div>
@@ -79,7 +79,7 @@
                 <input 
                   type="text" 
                   class="form-control form-control-sm rounded-3 shadow-none border-secondary-subtle"
-                  placeholder="Contoh: UPACARA, Senam Pagi, ISHOMA, Dhuha"
+                  placeholder="Contoh: Upacara Bendera, Senam Pagi, Ishoma, Dhuha"
                   v-model="form.custom_activity"
                 >
               </div>
@@ -95,14 +95,14 @@
               >
               <label class="form-check-label small fw-medium text-dark cursor-pointer" for="lock_switch">
                 <i class="bi bi-lock-fill text-warning me-1"></i>
-                Gembok / Kunci Slot Ini
+                Kunci Slot Ini (Gembok)
               </label>
               <small class="d-block text-muted fs-8 ms-4">
-                Slot yang dikunci tidak akan diubah atau digeser oleh fitur Auto-Generate.
+                Slot yang dikunci tidak akan diubah atau digeser saat Auto-Generate jadwal.
               </small>
             </div>
 
-            <!-- TOGGLE TERAPKAN UNTUK SEMUA KELAS (HANYA MUNCUL PADA KEGIATAN RUTIN) -->
+            <!-- TOGGLE TERAPKAN UNTUK SEMUA KELAS DALAM PROFIL WAKTU INI -->
             <div v-if="slotType === 'routine'" class="form-check form-switch p-2.5 bg-light rounded-3 border mb-2">
               <input 
                 class="form-check-input shadow-none ms-0 me-2 cursor-pointer" 
@@ -112,10 +112,10 @@
               >
               <label class="form-check-label small fw-medium text-dark cursor-pointer" for="apply_all_switch">
                 <i class="bi bi-grid-fill text-primary me-1"></i>
-                Terapkan untuk Semua Kelas
+                Terapkan ke Semua Kelas pada Profil Waktu Ini
               </label>
               <small class="d-block text-muted fs-8 ms-4">
-                Slot kegiatan ini akan otomatis disetting dan diterapkan ke seluruh kelas aktif.
+                Kegiatan ini akan diselaraskan pada jam dan hari yang sama untuk seluruh kelas yang menggunakan Profil Waktu ini.
               </small>
             </div>
 
@@ -140,21 +140,21 @@
               <div 
                 v-if="showClearMenu && slotType === 'routine'" 
                 class="position-absolute bottom-100 start-0 mb-1 bg-white border rounded-3 shadow-sm p-1" 
-                style="min-width: 180px; z-index: 1050;"
+                style="min-width: 220px; z-index: 1050;"
               >
                 <button 
                   type="button" 
                   class="btn btn-light btn-sm w-100 text-start fs-8 py-1.5 px-2 rounded-2 mb-1 border-0"
                   @click="handleClear(false)"
                 >
-                  <i class="bi bi-door-open me-1.5 text-muted"></i> Hanya Kelas Ini
+                  <i class="bi bi-door-open me-1.5 text-muted"></i> Hanya untuk Kelas Ini
                 </button>
                 <button 
                   type="button" 
                   class="btn btn-light btn-sm w-100 text-start fs-8 py-1.5 px-2 rounded-2 border-0 text-danger"
                   @click="handleClear(true)"
                 >
-                  <i class="bi bi-grid-fill me-1.5"></i> Semua Kelas
+                  <i class="bi bi-grid-fill me-1.5"></i> Semua Kelas di Profil Waktu Ini
                 </button>
               </div>
             </div>
@@ -293,7 +293,7 @@ const switchSlotType = (type: 'subject' | 'routine') => {
   showClearMenu.value = false;
   if (type === 'routine') {
     form.is_locked = true;
-    form.apply_to_all_classes = true;
+    form.apply_to_all_classes = false; // Default false agar manual assign per-kelas
   } else {
     form.apply_to_all_classes = false;
   }
@@ -308,7 +308,7 @@ watch(() => props.show, (newVal) => {
       form.custom_activity = props.currentSchedule?.custom_activity || '';
       form.class_subject_teacher_id = null;
       form.is_locked = props.currentSchedule?.is_locked ?? true;
-      form.apply_to_all_classes = true;
+      form.apply_to_all_classes = (props.currentSchedule as any)?.apply_to_all_classes ?? false;
     } else {
       slotType.value = 'subject';
       form.class_subject_teacher_id = props.currentSchedule?.class_subject_teacher_id || null;
@@ -326,18 +326,23 @@ const handleClose = () => {
 
 const handleSave = () => {
   showClearMenu.value = false;
+  const isApplyAll = slotType.value === 'routine' ? form.apply_to_all_classes : false;
   emit('save', {
     class_subject_teacher_id: slotType.value === 'subject' ? form.class_subject_teacher_id : null,
     custom_activity: slotType.value === 'routine' ? (form.custom_activity.trim() || null) : null,
     is_locked: form.is_locked,
-    apply_to_all_classes: slotType.value === 'routine' ? form.apply_to_all_classes : false,
+    apply_to_all_classes: isApplyAll,
+    apply_to_all_profiles: isApplyAll,
   });
 };
 
 const handleClear = (clearAllClasses: boolean = false) => {
   showClearMenu.value = false;
   const forceClearAll = slotType.value === 'subject' ? false : clearAllClasses;
-  emit('clear', { clear_all_classes: forceClearAll });
+  emit('clear', { 
+    clear_all_classes: forceClearAll,
+    clear_all_profiles: forceClearAll,
+  });
 };
 
 const capitalize = (str: string) => (str ? str.charAt(0).toUpperCase() + str.slice(1) : '');

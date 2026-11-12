@@ -21,6 +21,7 @@ class ManualAssignScheduleRequest extends FormRequest
             'custom_activity'          => ['nullable', 'string', 'max:255'],
             'is_locked'                => ['nullable', 'boolean'],
             'apply_to_all_classes'     => ['nullable', 'boolean'],
+            'apply_to_all_profiles'    => ['nullable', 'boolean'],
         ];
     }
 
