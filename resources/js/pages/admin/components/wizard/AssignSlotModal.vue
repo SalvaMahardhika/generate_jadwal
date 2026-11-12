@@ -52,23 +52,31 @@
             <!-- OPSI A: MATA PELAJARAN -->
             <div v-if="slotType === 'subject'">
               <div class="mb-3">
-                <label class="form-label fw-medium text-dark small">Mata Pelajaran & Guru Pengampu <span class="text-danger">*</span></label>
+                <label class="form-label fw-medium text-dark small" :class="{ 'opacity-50': isAllSubjectsFull }">
+                  Mata Pelajaran & Guru Pengampu <span class="text-danger">*</span>
+                </label>
                 <select 
-                  class="form-select form-select-sm rounded-3 shadow-none border-secondary-subtle"
+                  class="form-select form-select-sm rounded-3 shadow-none border-secondary-subtle transition-all"
+                  :class="{ 'opacity-50 bg-light': isAllSubjectsFull }"
                   v-model="form.class_subject_teacher_id"
+                  :disabled="isAllSubjectsFull"
                 >
-                  <option :value="null">-- Pilih Mata Pelajaran --</option>
+                  <option :value="null">
+                    {{ isAllSubjectsFull ? '-- Semua mata pelajaran sudah terplot 100% --' : '-- Pilih Mata Pelajaran --' }}
+                  </option>
                   <option 
-                    v-for="cst in availableSubjectsWithQuota" 
+                    v-for="cst in selectableSubjects" 
                     :key="cst.id" 
                     :value="cst.id"
-                    :disabled="cst.isFull && cst.id !== currentSchedule?.class_subject_teacher_id"
                   >
                     {{ cst.subjectName }} — {{ cst.teacherName }} 
-                    ({{ cst.assignedJp }}/{{ cst.maxJp }} JP) 
-                    <template v-if="cst.isFull && cst.id !== currentSchedule?.class_subject_teacher_id">[KUOTA PENUH]</template>
+                    ({{ cst.assignedJp }}/{{ cst.maxJp }} JP)
                   </option>
                 </select>
+                <small v-if="isAllSubjectsFull" class="d-block text-muted fs-8 mt-1">
+                  <i class="bi bi-check-circle-fill text-success me-1"></i>
+                  Seluruh alokasi JP mata pelajaran pada kelas ini sudah terpenuhi.
+                </small>
               </div>
             </div>
 
@@ -173,7 +181,7 @@
                 type="button" 
                 class="btn btn-primary rounded-3 py-1.5 px-3 small fw-semibold shadow-none d-flex align-items-center gap-1.5"
                 @click="handleSave"
-                :disabled="isProcessing"
+                :disabled="isSaveDisabled"
               >
                 <span v-if="!isProcessing">Simpan</span>
                 <span v-else class="spinner-border spinner-border-sm" role="status"></span>
@@ -288,6 +296,27 @@ const availableSubjectsWithQuota = computed(() => {
   });
 });
 
+// Hanya tampilkan mapel yang kuota JP-nya belum terplot 100% (atau mapel yang sedang menempati slot ini)
+const selectableSubjects = computed(() => {
+  return availableSubjectsWithQuota.value.filter(
+    (cst) => !cst.isFull || cst.id === props.currentSchedule?.class_subject_teacher_id
+  );
+});
+
+// Cek apakah semua mapel sudah terplot 100%
+const isAllSubjectsFull = computed(() => {
+  return selectableSubjects.value.length === 0;
+});
+
+// Status disabled tombol Simpan
+const isSaveDisabled = computed(() => {
+  if (props.isProcessing) return true;
+  if (slotType.value === 'subject') {
+    return isAllSubjectsFull.value || !form.class_subject_teacher_id;
+  }
+  return !form.custom_activity || form.custom_activity.trim() === '';
+});
+
 const switchSlotType = (type: 'subject' | 'routine') => {
   slotType.value = type;
   showClearMenu.value = false;
@@ -325,6 +354,7 @@ const handleClose = () => {
 };
 
 const handleSave = () => {
+  if (isSaveDisabled.value) return;
   showClearMenu.value = false;
   const isApplyAll = slotType.value === 'routine' ? form.apply_to_all_classes : false;
   emit('save', {
