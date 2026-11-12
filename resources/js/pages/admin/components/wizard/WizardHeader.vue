@@ -85,6 +85,7 @@
         </button>
 
         <button 
+          v-if="viewMode !== 'teacher'"
           type="button" 
           class="btn btn-primary btn-sm rounded-3 px-3 fw-semibold d-flex align-items-center gap-1.5 shadow-none"
           @click="emit('generate')"
