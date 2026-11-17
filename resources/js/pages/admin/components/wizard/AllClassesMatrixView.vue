@@ -9,7 +9,7 @@
         </span>
         <button 
           v-for="cls in classes" 
-          :key="cls.id"
+          :key="cls.id" 
           type="button"
           class="badge bg-light text-primary border border-primary-subtle py-1.5 px-2.5 fs-8 fw-semibold rounded-2 transition-all cursor-pointer shadow-none"
           @click="scrollToClass(cls.id)"
@@ -143,7 +143,6 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
 import type { TimeSlot, ScheduleItem } from '../../../../types/wizard';
 import type { ClassItem } from '../../../../types/class';
 
@@ -159,11 +158,14 @@ const emit = defineEmits(['cellClick']);
 const days = ['senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu'];
 
 const getTimeSlotsForClass = (cls: ClassItem): TimeSlot[] => {
-  if (cls.time_slot_profile_id) {
-    const filtered = props.timeSlots.filter(s => s.time_slot_profile_id === cls.time_slot_profile_id);
+  if (cls.time_slot_profile_id !== null && cls.time_slot_profile_id !== undefined) {
+    const filtered = props.timeSlots.filter(
+      s => Number(s.time_slot_profile_id) === Number(cls.time_slot_profile_id)
+    );
     if (filtered.length > 0) return filtered;
   }
-  return props.timeSlots;
+  const withoutProfile = props.timeSlots.filter(s => !s.time_slot_profile_id);
+  return withoutProfile.length > 0 ? withoutProfile : props.timeSlots;
 };
 
 const getPeriodNumbersForClass = (cls: ClassItem): number[] => {
@@ -175,7 +177,9 @@ const getPeriodNumbersForClass = (cls: ClassItem): number[] => {
 
 const getSlot = (cls: ClassItem, day: string, periodNumber: number): TimeSlot | undefined => {
   const slots = getTimeSlotsForClass(cls);
-  return slots.find(slot => slot.day.toLowerCase() === day.toLowerCase() && slot.period_number === periodNumber);
+  return slots.find(
+    slot => slot.day.toLowerCase() === day.toLowerCase() && Number(slot.period_number) === Number(periodNumber)
+  );
 };
 
 const isBreakSlot = (cls: ClassItem, day: string, periodNumber: number): boolean => {
@@ -185,27 +189,45 @@ const isBreakSlot = (cls: ClassItem, day: string, periodNumber: number): boolean
 
 const getTimeLabel = (cls: ClassItem, periodNumber: number): string => {
   const slots = getTimeSlotsForClass(cls);
-  const slot = slots.find(s => s.period_number === periodNumber);
+  const slot = slots.find(s => Number(s.period_number) === Number(periodNumber));
   if (!slot) return '';
   return `${slot.start_time.substring(0, 5)} - ${slot.end_time.substring(0, 5)}`;
 };
 
 const getSchedule = (classId: number, day: string, periodNumber: number): ScheduleItem | null => {
-  const cls = props.classes.find(c => c.id === classId);
+  if (!props.matrix) return null;
+  const classMatrix = props.matrix[classId] || (props.matrix as Record<string, Record<string, ScheduleItem>>)[String(classId)];
+  if (!classMatrix) return null;
+
+  const cls = props.classes.find(c => Number(c.id) === Number(classId));
   if (!cls) return null;
+
   const slot = getSlot(cls, day, periodNumber);
-  if (!slot || !props.matrix || !props.matrix[classId]) return null;
-  return props.matrix[classId][slot.id] || null;
+  if (slot) {
+    const directMatch = classMatrix[slot.id] || (classMatrix as Record<string, ScheduleItem>)[String(slot.id)];
+    if (directMatch) return directMatch;
+  }
+
+  // Fallback jika jadwal di database tersimpan dengan ID slot dari profil berbeda namun hari & jam ke-N sama
+  const fallbackMatch = Object.values(classMatrix).find((sched) => {
+    if (!sched) return false;
+    const schedSlot = sched.time_slot || props.timeSlots.find(s => Number(s.id) === Number(sched.time_slot_id));
+    if (!schedSlot) return false;
+    return schedSlot.day.toLowerCase() === day.toLowerCase() && Number(schedSlot.period_number) === Number(periodNumber);
+  });
+
+  return fallbackMatch || null;
 };
 
 const handleCellClick = (classId: number, day: string, periodNumber: number) => {
-  const cls = props.classes.find(c => c.id === classId);
+  const cls = props.classes.find(c => Number(c.id) === Number(classId));
   if (!cls) return;
   const slot = getSlot(cls, day, periodNumber);
   if (slot && !slot.is_break) {
+    const existingSchedule = getSchedule(classId, day, periodNumber);
     emit('cellClick', {
-      slot,
-      schedule: getSchedule(classId, day, periodNumber),
+      slot: existingSchedule?.time_slot || slot,
+      schedule: existingSchedule,
       classId,
     });
   }

@@ -139,9 +139,9 @@ Route::prefix('v1')->group(function () {
         Route::get('/matrix/teacher/{teacher}', [ScheduleWizardController::class, 'getTeacherMatrix']);
         Route::get('/matrix/class/{class}', [ScheduleWizardController::class, 'getMatrix']);
         Route::get('/matrix/{class}', [ScheduleWizardController::class, 'getMatrix']); // Kompatibilitas rute lama
-        
+
         Route::get('/balance/{class}', [ScheduleWizardController::class, 'getBalance']);
-        
+
         // Aksi Generator & Editor
         Route::post('/generate', [ScheduleWizardController::class, 'generate']);
         Route::post('/lock-slot', [ScheduleWizardController::class, 'lockSlot']);
@@ -149,7 +149,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/clear-slot', [ScheduleWizardController::class, 'clearSlot']);
         Route::post('/reset', [ScheduleWizardController::class, 'reset']);
         Route::post('/publish', [ScheduleWizardController::class, 'publish']);
-        Route::post('/unpublish', [ScheduleWizardController::class, 'unpublish']);
+        Route::post('/delete-published', [ScheduleWizardController::class, 'deletePublished']);
     });
 
 });

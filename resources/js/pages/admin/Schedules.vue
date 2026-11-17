@@ -10,14 +10,14 @@
         </div>
 
         <div class="d-flex flex-wrap align-items-center gap-2">
-          <!-- Tombol Buka Modal Unpublish -->
+          <!-- Tombol Hapus Semua Jadwal Resmi -->
           <button 
             type="button" 
-            class="btn btn-outline-warning btn-sm rounded-3 px-3 fw-semibold shadow-none d-flex align-items-center gap-1.5"
-            @click="showUnpublishModal = true"
-            :disabled="wizardStore.isProcessing"
+            class="btn btn-outline-danger btn-sm rounded-3 px-3 fw-semibold shadow-none d-flex align-items-center gap-1.5"
+            @click="showDeletePublishedModal = true"
+            :disabled="wizardStore.isProcessing || !wizardStore.selectedAcademicYearId"
           >
-            <i class="bi bi-unlock-fill"></i> Buka Kembali ke Draft
+            <i class="bi bi-trash3-fill"></i> Hapus Jadwal Resmi
           </button>
 
           <!-- Tombol Export Excel -->
@@ -40,6 +40,14 @@
           <span>{{ wizardStore.successMessage }}</span>
         </div>
         <button type="button" class="btn-close small" @click="wizardStore.successMessage = null"></button>
+      </div>
+
+      <div v-if="wizardStore.errorMessage" class="alert alert-danger border-0 rounded-3 py-2 px-3 small d-flex align-items-center justify-content-between mb-3 print-hide">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-exclamation-triangle-fill"></i>
+          <span>{{ wizardStore.errorMessage }}</span>
+        </div>
+        <button type="button" class="btn-close small" @click="wizardStore.errorMessage = null"></button>
       </div>
 
       <!-- PANEL KONTROL VIEW & FILTER -->
@@ -161,45 +169,46 @@
 
     </div>
 
-    <!-- MODAL KONFIRMASI BUKA KEMBALI KE DRAFT -->
+    <!-- MODAL KONFIRMASI HAPUS SELURUH JADWAL RESMI -->
     <div 
-      v-if="showUnpublishModal" 
+      v-if="showDeletePublishedModal" 
       class="modal fade show d-block" 
       tabindex="-1" 
       style="background-color: rgba(15, 23, 42, 0.45); backdrop-filter: blur(3px);"
     >
-      <div class="modal-dialog modal-dialog-centered" style="max-width: 440px;">
+      <div class="modal-dialog modal-dialog-centered" style="max-width: 450px;">
         <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
           <div class="modal-body p-4 text-center">
             
             <div class="mb-3">
-              <div class="mx-auto rounded-circle bg-warning-subtle text-warning d-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
-                <i class="bi bi-unlock-fill fs-2"></i>
+              <div class="mx-auto rounded-circle bg-danger-subtle text-danger d-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                <i class="bi bi-trash3-fill fs-2"></i>
               </div>
             </div>
 
-            <h5 class="fw-bold text-dark mb-2">Buka Kembali ke Draft?</h5>
+            <h5 class="fw-bold text-dark mb-2">Hapus Semua Jadwal Resmi?</h5>
             <p class="text-secondary small mb-4">
-              Jadwal yang telah dipublikasikan akan dikembalikan menjadi status <strong>DRAFT</strong>. Anda akan dapat mengedit atau me-generate ulang jadwal di halaman Wizard.
+              Seluruh jadwal resmi pada <strong>{{ currentAcademicYearName }}</strong> untuk <strong>semua kelas</strong> (termasuk kegiatan rutin seperti upacara, senam, dll.) akan dihapus bersih dari halaman Jadwal Resmi.
+              <br><span class="text-muted mt-1 d-inline-block">(Draft jadwal Anda di halaman Wizard tetap aman dan tidak terhapus).</span>
             </p>
 
             <div class="d-flex align-items-center justify-content-center gap-2">
               <button 
                 type="button" 
                 class="btn btn-light rounded-3 px-4 fw-semibold text-secondary shadow-none border"
-                @click="showUnpublishModal = false"
+                @click="showDeletePublishedModal = false"
                 :disabled="wizardStore.isProcessing"
               >
                 Batal
               </button>
               <button 
                 type="button" 
-                class="btn btn-warning rounded-3 px-4 fw-semibold shadow-none text-dark d-flex align-items-center gap-2"
-                @click="executeUnpublish"
+                class="btn btn-danger rounded-3 px-4 fw-semibold shadow-none d-flex align-items-center gap-2"
+                @click="executeDeletePublished"
                 :disabled="wizardStore.isProcessing"
               >
                 <span v-if="wizardStore.isProcessing" class="spinner-border spinner-border-sm" role="status"></span>
-                <span>Ya, Kembalikan Draft</span>
+                <span>Ya, Hapus Semua</span>
               </button>
             </div>
 
@@ -233,7 +242,7 @@ const academicYearsList = ref<AcademicYear[]>([]);
 const classesList = ref<ClassItem[]>([]);
 const teachersList = ref<TeacherOption[]>([]);
 const isExporting = ref<boolean>(false);
-const showUnpublishModal = ref<boolean>(false);
+const showDeletePublishedModal = ref<boolean>(false);
 
 const currentAcademicYearName = computed(() => {
   const ay = academicYearsList.value.find(a => a.id === wizardStore.selectedAcademicYearId);
@@ -289,16 +298,17 @@ watch(() => wizardStore.selectedTeacherId, (newId) => {
 });
 
 onMounted(async () => {
+  wizardStore.scheduleSource = 'published'; // Pastikan halaman Jadwal Resmi membaca tabel published_schedules
   wizardStore.viewMode = 'master'; // Default awal ke Semua Kelas
   await fetchDropdowns();
   wizardStore.refreshCurrentView();
 });
 
-const executeUnpublish = async () => {
+const executeDeletePublished = async () => {
   try {
-    await wizardStore.unpublishSchedule(wizardStore.selectedClassId);
+    await wizardStore.deletePublishedSchedule();
   } finally {
-    showUnpublishModal.value = false;
+    showDeletePublishedModal.value = false;
   }
 };
 
@@ -311,7 +321,7 @@ const handleExportExcel = async () => {
   try {
     isExporting.value = true;
     
-    const res = await WizardService.getMasterMatrix(wizardStore.selectedAcademicYearId);
+    const res = await WizardService.getMasterMatrix(wizardStore.selectedAcademicYearId, 'published');
 
     if (res.status === 'success' && res.data) {
       await exportScheduleToExcel({
@@ -321,7 +331,7 @@ const handleExportExcel = async () => {
         academicYearName: currentAcademicYearName.value,
       });
     } else {
-      alert('Gagal mengambil data jadwal untuk di-export.');
+      alert('Gagal mengambil data jadwal resmi untuk di-export.');
     }
   } catch (err) {
     console.error('Error export Excel:', err);
@@ -337,8 +347,8 @@ const handleExportExcel = async () => {
   background-color: #ffffff !important;
 }
 
-.bg-warning-subtle {
-  background-color: #fef9c3 !important;
+.bg-danger-subtle {
+  background-color: #fee2e2 !important;
 }
 
 @media print {

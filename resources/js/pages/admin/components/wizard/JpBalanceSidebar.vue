@@ -54,7 +54,7 @@
                   'bg-warning': item.status === 'under',
                   'bg-danger': item.status === 'over',
                 }"
-                :style="{ width: `${Math.min(100, (item.assigned_jp / item.target_jp) * 100)}%` }"
+                :style="{ width: `${item.target_jp > 0 ? Math.min(100, (item.assigned_jp / item.target_jp) * 100) : 0}%` }"
               ></div>
             </div>
           </div>

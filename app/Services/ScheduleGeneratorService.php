@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Classes;
 use App\Models\ClassSubject;
 use App\Models\ClassSubjectTeacher;
+use App\Models\PublishedSchedule;
 use App\Models\Schedule;
 use App\Models\TimeSlot;
 use App\Models\Teacher;
@@ -58,7 +59,7 @@ class ScheduleGeneratorService
     }
 
     /**
-     * Memeriksa bentrok jadwal guru di kelas lain pada rentang waktu beririsan.
+     * Memeriksa bentrok jadwal guru di kelas lain pada rentang waktu beririsan (Staging / Wizard).
      */
     public function checkTeacherConflict(
         int|array $teacherIds,
@@ -96,18 +97,19 @@ class ScheduleGeneratorService
     /**
      * Menghitung keseimbangan (balance) beban JP mapel per kelas.
      */
-    public function getClassBalance(int $classId, int $academicYearId): array
+    public function getClassBalance(int $classId, int $academicYearId, string $source = 'draft'): array
     {
         $classSubjects = ClassSubject::with(['subject', 'classSubjectTeachers.teacher'])
             ->where('class_id', $classId)
             ->get();
 
+        $modelClass = $source === 'published' ? PublishedSchedule::class : Schedule::class;
         $balanceReport = [];
 
         foreach ($classSubjects as $cs) {
             $cstIds = $cs->classSubjectTeachers->pluck('id');
 
-            $assignedJp = Schedule::where('academic_year_id', $academicYearId)
+            $assignedJp = $modelClass::where('academic_year_id', $academicYearId)
                 ->where('class_id', $classId)
                 ->whereIn('class_subject_teacher_id', $cstIds)
                 ->count();
@@ -123,25 +125,26 @@ class ScheduleGeneratorService
 
             $balanceReport[] = [
                 'class_subject_id' => $cs->id,
-                'subject_code'      => $cs->subject?->subject_code ?? '-',
-                'subject_name'      => $cs->subject?->subject_name ?? '-',
-                'color_code'        => $cs->subject?->color_code ?? '#cbd5e1',
-                'teachers'          => $cs->classSubjectTeachers->map(fn($cst) => $cst->teacher?->name)->filter()->join(', '),
-                'target_jp'         => $targetJp,
-                'assigned_jp'       => $assignedJp,
-                'remaining_jp'      => max(0, $targetJp - $assignedJp),
-                'status'            => $status,
+                'subject_code'     => $cs->subject?->subject_code ?? '-',
+                'subject_name'     => $cs->subject?->subject_name ?? '-',
+                'color_code'       => $cs->subject?->color_code ?? '#cbd5e1',
+                'teachers'         => $cs->classSubjectTeachers->map(fn($cst) => $cst->teacher?->name)->filter()->join(', '),
+                'target_jp'        => $targetJp,
+                'assigned_jp'      => $assignedJp,
+                'remaining_jp'     => max(0, $targetJp - $assignedJp),
+                'status'           => $status,
             ];
         }
 
         return $balanceReport;
     }
 
-    public function getTeacherMatrixData(int $teacherId, int $academicYearId, ?int $profileId = null): array
+    public function getTeacherMatrixData(int $teacherId, int $academicYearId, ?int $profileId = null, string $source = 'draft'): array
     {
         $teacher = Teacher::findOrFail($teacherId);
+        $modelClass = $source === 'published' ? PublishedSchedule::class : Schedule::class;
 
-        $schedules = Schedule::with([
+        $schedules = $modelClass::with([
             'class.grade',
             'class.major',
             'class.timeSlotProfile',
@@ -157,6 +160,11 @@ class ScheduleGeneratorService
             $q->where('teacher_id', $teacherId);
         })
         ->get()
+        ->each(function ($item) use ($source) {
+            if ($source === 'published') {
+                $item->setAttribute('status', 'published');
+            }
+        })
         ->keyBy('id');
 
         return [
@@ -166,7 +174,7 @@ class ScheduleGeneratorService
         ];
     }
 
-    public function getMasterMatrixData(int $academicYearId, ?int $profileId = null): array
+    public function getMasterMatrixData(int $academicYearId, ?int $profileId = null, string $source = 'draft'): array
     {
         $classes = Classes::with(['grade', 'major', 'timeSlotProfile'])
             ->where('academic_year_id', $academicYearId)
@@ -174,7 +182,9 @@ class ScheduleGeneratorService
             ->where('status', 'active')
             ->get();
 
-        $schedules = Schedule::with([
+        $modelClass = $source === 'published' ? PublishedSchedule::class : Schedule::class;
+
+        $schedules = $modelClass::with([
             'classSubjectTeacher.classSubject.subject',
             'classSubjectTeacher.teacher',
             'timeSlot',
@@ -182,6 +192,11 @@ class ScheduleGeneratorService
         ->where('academic_year_id', $academicYearId)
         ->whereIn('class_id', $classes->pluck('id'))
         ->get()
+        ->each(function ($item) use ($source) {
+            if ($source === 'published') {
+                $item->setAttribute('status', 'published');
+            }
+        })
         ->groupBy('class_id');
 
         $matrix = [];
@@ -326,10 +341,10 @@ class ScheduleGeneratorService
                             $blockPool[] = [
                                 'class_subject_id'         => $cs->id,
                                 'class_subject_teacher_id' => $cst->id,
-                                'teacher_id'                => $teacherId,
+                                'teacher_id'               => $teacherId,
                                 'max_jp_per_day'           => $maxJpPerDay,
-                                'size'                      => $blockSize,
-                                'is_specialist'             => $isSpecialist,
+                                'size'                     => $blockSize,
+                                'is_specialist'            => $isSpecialist,
                                 'is_joint_subject'         => $isJointSubject,
                                 'is_pjok'                  => $isPjok,
                                 'random_weight'            => rand(1, 1000),
@@ -367,7 +382,7 @@ class ScheduleGeneratorService
                             'class_id'         => $class->id,
                             'class_name'       => $class->class_name,
                             'class_subject_id' => $block['class_subject_id'],
-                            'size'              => $block['size'],
+                            'size'             => $block['size'],
                         ];
                     }
                 }
@@ -448,7 +463,7 @@ class ScheduleGeneratorService
                             'class_subject_teacher_id' => $block['class_subject_teacher_id'],
                             'is_locked'                => false,
                             'status'                   => 'draft',
-                            'created_by'                => $userId,
+                            'created_by'               => $userId,
                         ]);
 
                         $lockedSchedules->put($slot->id, $createdSchedule);
@@ -475,7 +490,8 @@ class ScheduleGeneratorService
             $schedule->is_locked                = $data['is_locked'];
             $schedule->custom_activity          = $data['custom_activity'] ?? null;
             $schedule->class_subject_teacher_id = $data['class_subject_teacher_id'] ?? null;
-            $schedule->created_by                = $userId;
+            $schedule->status                   = 'draft';
+            $schedule->created_by               = $userId;
             $schedule->save();
 
             return $schedule->load(['timeSlot', 'classSubjectTeacher.classSubject.subject', 'classSubjectTeacher.teacher']);
@@ -500,7 +516,6 @@ class ScheduleGeneratorService
         $sourceClass = Classes::findOrFail($data['class_id']);
 
         if ($applyToAll) {
-            // PERBAIKAN: Hanya cari kelas aktif yang memiliki time_slot_profile_id yang sama dengan kelas asal
             $targetClasses = Classes::where('academic_year_id', $data['academic_year_id'])
                 ->where('time_slot_profile_id', $sourceClass->time_slot_profile_id)
                 ->where('status', 'active')
@@ -614,7 +629,8 @@ class ScheduleGeneratorService
                         'class_subject_teacher_id' => $targetCst?->id,
                         'custom_activity'          => $data['custom_activity'] ?? null,
                         'is_locked'                => $isLocked,
-                        'created_by'                => $userId,
+                        'status'                   => 'draft',
+                        'created_by'               => $userId,
                     ]
                 );
 
@@ -644,7 +660,6 @@ class ScheduleGeneratorService
         $sourceClass = Classes::find($classId);
         $profileId = $sourceClass ? $sourceClass->time_slot_profile_id : $sourceSlot->time_slot_profile_id;
 
-        // PERBAIKAN: Filter hanya untuk kelas aktif yang se-profil waktu
         $targetClasses = Classes::where('academic_year_id', $academicYearId)
             ->where('time_slot_profile_id', $profileId)
             ->where('status', 'active')
@@ -668,7 +683,6 @@ class ScheduleGeneratorService
             return false;
         }
 
-        // PERBAIKAN: Hapus hanya pada kelas-kelas target yang bernaung di bawah profil waktu yang sama
         return Schedule::where('academic_year_id', $academicYearId)
             ->whereIn('class_id', $targetClassIds)
             ->whereIn('time_slot_id', array_unique($equivalentSlotIds))
@@ -683,17 +697,72 @@ class ScheduleGeneratorService
             ->delete();
     }
 
-    public function publish(int $academicYearId, ?int $classId = null): int
+    /**
+     * Mempublikasikan jadwal dari tabel staging (schedules) ke tabel resmi (published_schedules).
+     * Jika jadwal resmi sudah ada dan $force = false, kembalikan flag konfirmasi ke frontend.
+     */
+    public function publish(int $academicYearId, ?int $classId = null, bool $force = false, int $userId = 1): array
     {
-        return Schedule::where('academic_year_id', $academicYearId)
+        $draftQuery = Schedule::where('academic_year_id', $academicYearId)
+            ->when($classId, fn($q) => $q->where('class_id', $classId));
+
+        $draftSchedules = $draftQuery->get();
+
+        if ($draftSchedules->isEmpty()) {
+            throw new Exception('Tidak ada jadwal di Wizard yang dapat dipublikasikan.', 422);
+        }
+
+        $existingPublishedCount = PublishedSchedule::where('academic_year_id', $academicYearId)
             ->when($classId, fn($q) => $q->where('class_id', $classId))
-            ->update(['status' => 'published']);
+            ->count();
+
+        if ($existingPublishedCount > 0 && !$force) {
+            return [
+                'requires_confirmation' => true,
+                'existing_count'        => $existingPublishedCount,
+                'published_count'       => 0,
+            ];
+        }
+
+        return DB::transaction(function () use ($academicYearId, $classId, $draftSchedules, $userId) {
+            // Hapus jadwal resmi lama yang terdampak sebelum menyalin draft baru
+            PublishedSchedule::where('academic_year_id', $academicYearId)
+                ->when($classId, fn($q) => $q->where('class_id', $classId))
+                ->delete();
+
+            $now = now();
+            $rowsToInsert = $draftSchedules->map(function ($item) use ($userId, $now) {
+                return [
+                    'academic_year_id'         => $item->academic_year_id,
+                    'class_id'                 => $item->class_id,
+                    'time_slot_id'             => $item->time_slot_id,
+                    'class_subject_teacher_id' => $item->class_subject_teacher_id,
+                    'is_locked'                => (bool) $item->is_locked,
+                    'custom_activity'          => $item->custom_activity,
+                    'created_by'               => $item->created_by ?? $userId,
+                    'created_at'               => $now,
+                    'updated_at'               => $now,
+                ];
+            })->toArray();
+
+            foreach (array_chunk($rowsToInsert, 500) as $chunk) {
+                PublishedSchedule::insert($chunk);
+            }
+
+            return [
+                'requires_confirmation' => false,
+                'existing_count'        => 0,
+                'published_count'       => count($rowsToInsert),
+            ];
+        });
     }
 
-    public function unpublish(int $academicYearId, ?int $classId = null): int
+    /**
+     * Menghapus seluruh jadwal resmi pada tahun ajaran terkait dari tabel published_schedules.
+     * Jadwal draft di tabel schedules (Wizard) tetap aman dan tidak tersentuh.
+     */
+    public function deletePublished(int $academicYearId): int
     {
-        return Schedule::where('academic_year_id', $academicYearId)
-            ->when($classId, fn($q) => $q->where('class_id', $classId))
-            ->update(['status' => 'draft']);
+        return PublishedSchedule::where('academic_year_id', $academicYearId)->delete();
     }
 }

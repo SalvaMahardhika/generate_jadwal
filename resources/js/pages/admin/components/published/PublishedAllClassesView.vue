@@ -81,7 +81,7 @@
                   ISTIRAHAT
                 </span>
 
-                <template v-else-if="getSchedule(cls.id, day, periodNumber) && getSchedule(cls.id, day, periodNumber)?.status === 'published'">
+                <template v-else-if="isPublishedSchedule(getSchedule(cls.id, day, periodNumber))">
                   <div 
                     v-if="getSchedule(cls.id, day, periodNumber)?.custom_activity" 
                     class="full-block-tile rounded-2 p-2 h-100 d-flex flex-column justify-content-center align-items-center"
@@ -149,6 +149,10 @@ const props = defineProps<{
 
 const days = ['senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu'];
 
+const isPublishedSchedule = (sched: ScheduleItem | null): boolean => {
+  return Boolean(sched && (!sched.status || sched.status === 'published'));
+};
+
 const getTimeSlotsForClass = (cls: ClassItem): TimeSlot[] => {
   if (cls.time_slot_profile_id) {
     const filtered = props.timeSlots.filter(s => s.time_slot_profile_id === cls.time_slot_profile_id);
@@ -215,7 +219,7 @@ const getClassLegendItems = (classId: number) => {
   const classSchedules = props.matrix[classId] || {};
 
   Object.values(classSchedules).forEach((sched) => {
-    if (sched && sched.status === 'published' && sched.class_subject_teacher) {
+    if (isPublishedSchedule(sched) && sched.class_subject_teacher) {
       const cst = sched.class_subject_teacher;
       const subjName = cst.class_subject?.subject?.subject_name || '-';
       const tchrName = cst.teacher?.name || '-';

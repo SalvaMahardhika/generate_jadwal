@@ -1,6 +1,8 @@
 import type { ClassItem, TeacherOption } from './class';
 import type { Subject } from './subject';
 
+export type ScheduleSource = 'draft' | 'published';
+
 export interface TimeSlot {
   id: number;
   time_slot_profile_id?: number;
@@ -119,11 +121,17 @@ export interface ResetSchedulePayload {
 export interface PublishSchedulePayload {
   academic_year_id: number;
   class_id?: number | null;
+  force?: boolean;
 }
 
-export interface UnpublishSchedulePayload {
+export interface PublishResult {
+  requires_confirmation: boolean;
+  existing_count: number;
+  published_count: number;
+}
+
+export interface DeletePublishedSchedulePayload {
   academic_year_id: number;
-  class_id?: number | null;
 }
 
 export interface GenerateResult {

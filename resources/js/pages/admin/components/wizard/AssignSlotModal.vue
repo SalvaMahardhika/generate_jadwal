@@ -205,6 +205,7 @@ const wizardStore = useWizardStore();
 
 const props = defineProps<{
   show: boolean;
+  classId?: number | null;
   timeSlot: TimeSlot | null;
   currentSchedule: ScheduleItem | null;
   availableSubjects: ClassSubjectTeacherDetail[];
@@ -246,13 +247,17 @@ const isEditingSubject = computed(() => {
 const availableSubjectsWithQuota = computed(() => {
   let allScheduleValues: ScheduleItem[] = [];
 
-  const storeAny = wizardStore as any;
-  if (storeAny.schedules && typeof storeAny.schedules === 'object' && Object.keys(storeAny.schedules).length > 0) {
-    allScheduleValues = Object.values(storeAny.schedules);
+  if (wizardStore.viewMode === 'master' && wizardStore.masterMatrix?.matrix) {
+    Object.values(wizardStore.masterMatrix.matrix).forEach((classSlots) => {
+      if (classSlots && typeof classSlots === 'object') {
+        Object.values(classSlots).forEach((sched) => {
+          if (sched) allScheduleValues.push(sched as ScheduleItem);
+        });
+      }
+    });
   } else if (wizardStore.classMatrix?.schedules) {
     allScheduleValues = Object.values(wizardStore.classMatrix.schedules);
   } else if (wizardStore.masterMatrix?.matrix) {
-    // Flatten struktur matrix [class_id][time_slot_id] menjadi array ScheduleItem[]
     Object.values(wizardStore.masterMatrix.matrix).forEach((classSlots) => {
       if (classSlots && typeof classSlots === 'object') {
         Object.values(classSlots).forEach((sched) => {
@@ -262,8 +267,8 @@ const availableSubjectsWithQuota = computed(() => {
     });
   }
 
-  // Tentukan ID kelas target dari slot yang sedang dipilih/diedit
-  const targetClassId = props.currentSchedule?.class_id || wizardStore.selectedClassId;
+  // Tentukan ID kelas target dari prop classId, currentSchedule, atau selectedClassId
+  const targetClassId = props.classId || props.currentSchedule?.class_id || wizardStore.selectedClassId;
 
   return props.availableSubjects.map((cst) => {
     const maxJp = (cst.jp !== undefined && cst.jp !== null && Number(cst.jp) > 0)
@@ -271,15 +276,15 @@ const availableSubjectsWithQuota = computed(() => {
       : (cst.class_subject?.total_jp || 0);
 
     const totalAssignedJp = allScheduleValues.filter((sched) => {
-      const isSameTeacher = sched.class_subject_teacher_id === cst.id;
+      const isSameTeacher = Number(sched.class_subject_teacher_id) === Number(cst.id);
       const isSameClass = targetClassId ? Number(sched.class_id) === Number(targetClassId) : true;
       return isSameTeacher && isSameClass;
     }).length;
 
     const otherSlotsCount = allScheduleValues.filter((sched) => {
-      const isSameTeacher = sched.class_subject_teacher_id === cst.id;
+      const isSameTeacher = Number(sched.class_subject_teacher_id) === Number(cst.id);
       const isSameClass = targetClassId ? Number(sched.class_id) === Number(targetClassId) : true;
-      const isDifferentSlot = sched.time_slot_id !== props.timeSlot?.id;
+      const isDifferentSlot = Number(sched.time_slot_id) !== Number(props.timeSlot?.id);
       return isSameTeacher && isSameClass && isDifferentSlot;
     }).length;
 
@@ -299,7 +304,7 @@ const availableSubjectsWithQuota = computed(() => {
 // Hanya tampilkan mapel yang kuota JP-nya belum terplot 100% (atau mapel yang sedang menempati slot ini)
 const selectableSubjects = computed(() => {
   return availableSubjectsWithQuota.value.filter(
-    (cst) => !cst.isFull || cst.id === props.currentSchedule?.class_subject_teacher_id
+    (cst) => !cst.isFull || Number(cst.id) === Number(props.currentSchedule?.class_subject_teacher_id)
   );
 });
 
@@ -322,7 +327,7 @@ const switchSlotType = (type: 'subject' | 'routine') => {
   showClearMenu.value = false;
   if (type === 'routine') {
     form.is_locked = true;
-    form.apply_to_all_classes = false; // Default false agar manual assign per-kelas
+    form.apply_to_all_classes = false;
   } else {
     form.apply_to_all_classes = false;
   }

@@ -1,26 +1,28 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { WizardService } from '../services/wizard.service';
-import type { 
-  ClassMatrixData, 
-  TeacherMatrixData, 
-  MasterMatrixData, 
+import type {
+  ClassMatrixData,
+  TeacherMatrixData,
+  MasterMatrixData,
   TimeSlot,
   LockSlotPayload,
   ManualAssignPayload,
-  ClearSlotPayload
+  ClearSlotPayload,
+  ScheduleSource
 } from '../types/wizard';
 
 export type WizardViewMode = 'class' | 'teacher' | 'master';
 
 export const useWizardStore = defineStore('wizard', () => {
   const viewMode = ref<WizardViewMode>('class');
+  const scheduleSource = ref<ScheduleSource>('draft');
   const selectedAcademicYearId = ref<number | null>(null);
   const selectedClassId = ref<number | null>(null);
   const selectedTeacherId = ref<number | null>(null);
-  
+
   // Dibuat null secara default agar dinamis mengikuti slot profil waktu kelas yang terdaftar.
-  const maxPeriodNumber = ref<number | null>(null); 
+  const maxPeriodNumber = ref<number | null>(null);
 
   const timeSlots = ref<TimeSlot[]>([]);
   const classMatrix = ref<ClassMatrixData | null>(null);
@@ -32,13 +34,19 @@ export const useWizardStore = defineStore('wizard', () => {
   const errorMessage = ref<string | null>(null);
   const successMessage = ref<string | null>(null);
 
-  const fetchClassMatrix = async (classId: number) => {
+  const fetchClassMatrix = async (classId: number, sourceOverride?: ScheduleSource) => {
     if (!classId) return;
     isLoading.value = true;
     errorMessage.value = null;
 
+    const source = sourceOverride ?? scheduleSource.value;
+
     try {
-      const response = await WizardService.getClassMatrix(classId, selectedAcademicYearId.value || undefined);
+      const response = await WizardService.getClassMatrix(
+        classId,
+        selectedAcademicYearId.value || undefined,
+        source
+      );
       if (response.status === 'success' && response.data) {
         classMatrix.value = response.data;
         timeSlots.value = response.data.time_slots || [];
@@ -50,13 +58,19 @@ export const useWizardStore = defineStore('wizard', () => {
     }
   };
 
-  const fetchTeacherMatrix = async (teacherId: number) => {
+  const fetchTeacherMatrix = async (teacherId: number, sourceOverride?: ScheduleSource) => {
     if (!teacherId || !selectedAcademicYearId.value) return;
     isLoading.value = true;
     errorMessage.value = null;
 
+    const source = sourceOverride ?? scheduleSource.value;
+
     try {
-      const response = await WizardService.getTeacherMatrix(teacherId, selectedAcademicYearId.value);
+      const response = await WizardService.getTeacherMatrix(
+        teacherId,
+        selectedAcademicYearId.value,
+        source
+      );
       if (response.status === 'success' && response.data) {
         teacherMatrix.value = response.data;
         timeSlots.value = response.data.time_slots || [];
@@ -68,13 +82,15 @@ export const useWizardStore = defineStore('wizard', () => {
     }
   };
 
-  const fetchMasterMatrix = async () => {
+  const fetchMasterMatrix = async (sourceOverride?: ScheduleSource) => {
     if (!selectedAcademicYearId.value) return;
     isLoading.value = true;
     errorMessage.value = null;
 
+    const source = sourceOverride ?? scheduleSource.value;
+
     try {
-      const response = await WizardService.getMasterMatrix(selectedAcademicYearId.value);
+      const response = await WizardService.getMasterMatrix(selectedAcademicYearId.value, source);
       if (response.status === 'success' && response.data) {
         masterMatrix.value = response.data;
         timeSlots.value = response.data.time_slots || [];
@@ -98,7 +114,7 @@ export const useWizardStore = defineStore('wizard', () => {
 
   const generateSchedule = async (classIdOnly?: number | null) => {
     if (!selectedAcademicYearId.value) return { success: false, message: 'Tahun ajaran belum dipilih.' };
-    
+
     isProcessing.value = true;
     errorMessage.value = null;
     successMessage.value = null;
@@ -107,7 +123,7 @@ export const useWizardStore = defineStore('wizard', () => {
       const response = await WizardService.generate({
         academic_year_id: selectedAcademicYearId.value,
         class_id: classIdOnly,
-        max_period_number: maxPeriodNumber.value, // Otomatis bernilai null jika tidak dibatasi
+        max_period_number: maxPeriodNumber.value,
       });
 
       if (response.status === 'success') {
@@ -220,7 +236,7 @@ export const useWizardStore = defineStore('wizard', () => {
     }
   };
 
-  const publishSchedule = async (classIdOnly?: number | null) => {
+  const publishSchedule = async (classIdOnly?: number | null, force = false) => {
     if (!selectedAcademicYearId.value) return { success: false, message: 'Tahun ajaran belum dipilih.' };
 
     isProcessing.value = true;
@@ -230,12 +246,21 @@ export const useWizardStore = defineStore('wizard', () => {
       const response = await WizardService.publish({
         academic_year_id: selectedAcademicYearId.value,
         class_id: classIdOnly,
+        force,
       });
 
       if (response.status === 'success') {
-        successMessage.value = response.message || 'Jadwal berhasil dipublikasikan.';
+        if (response.data?.requires_confirmation) {
+          return {
+            success: true,
+            requiresConfirmation: true,
+            existingCount: response.data.existing_count,
+          };
+        }
+
+        successMessage.value = response.message || 'Jadwal berhasil dipublikasikan ke Jadwal Resmi.';
         await refreshCurrentView();
-        return { success: true };
+        return { success: true, requiresConfirmation: false };
       }
       return { success: false, message: response.message };
     } catch (error: any) {
@@ -247,26 +272,25 @@ export const useWizardStore = defineStore('wizard', () => {
     }
   };
 
-  const unpublishSchedule = async (classIdOnly?: number | null) => {
+  const deletePublishedSchedule = async () => {
     if (!selectedAcademicYearId.value) return { success: false, message: 'Tahun ajaran belum dipilih.' };
 
     isProcessing.value = true;
     errorMessage.value = null;
 
     try {
-      const response = await WizardService.unpublish({
+      const response = await WizardService.deletePublished({
         academic_year_id: selectedAcademicYearId.value,
-        class_id: classIdOnly,
       });
 
       if (response.status === 'success') {
-        successMessage.value = response.message || 'Jadwal berhasil dikembalikan menjadi draft.';
+        successMessage.value = response.message || 'Seluruh jadwal resmi berhasil dihapus.';
         await refreshCurrentView();
         return { success: true };
       }
       return { success: false, message: response.message };
     } catch (error: any) {
-      const msg = error.response?.data?.message || 'Gagal mengembalikan jadwal ke draft.';
+      const msg = error.response?.data?.message || 'Gagal menghapus jadwal resmi.';
       errorMessage.value = msg;
       return { success: false, message: msg };
     } finally {
@@ -276,6 +300,7 @@ export const useWizardStore = defineStore('wizard', () => {
 
   return {
     viewMode,
+    scheduleSource,
     selectedAcademicYearId,
     selectedClassId,
     selectedTeacherId,
@@ -298,6 +323,6 @@ export const useWizardStore = defineStore('wizard', () => {
     clearSlot,
     resetSchedule,
     publishSchedule,
-    unpublishSchedule,
+    deletePublishedSchedule,
   };
 });

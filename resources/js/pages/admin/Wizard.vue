@@ -6,7 +6,7 @@
       <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-4 pb-2 border-bottom">
         <div>
           <h5 class="fw-bold text-dark mb-1">Wizard Auto-Generate & Editor Jadwal</h5>
-          <p class="text-secondary small mb-0">Kelola penyusunan jadwal pelajaran otomatis.</p>
+          <p class="text-secondary small mb-0">Kelola penyusunan jadwal pelajaran otomatis (Staging / Draft).</p>
         </div>
       </div>
 
@@ -71,7 +71,7 @@
 
       <div v-else-if="wizardStore.viewMode === 'master'">
         <AllClassesMatrixView 
-          :classes="classesList"
+          :classes="wizardStore.masterMatrix?.classes || classesList"
           :timeSlots="wizardStore.timeSlots"
           :matrix="wizardStore.masterMatrix?.matrix || {}"
           :isLoading="wizardStore.isLoading"
@@ -84,6 +84,7 @@
     <!-- MODAL EDIT SLOT -->
     <AssignSlotModal 
       :show="showModal"
+      :classId="activeClassId"
       :timeSlot="activeSlot"
       :currentSchedule="activeSchedule"
       :availableSubjects="availableClassSubjects"
@@ -92,6 +93,53 @@
       @save="handleSaveSlot"
       @clear="handleClearSlot"
     />
+
+    <!-- MODAL KONFIRMASI TIMPA JADWAL RESMI SAAT PUBLISH -->
+    <div 
+      v-if="showOverwritePublishModal" 
+      class="modal fade show d-block" 
+      tabindex="-1" 
+      style="background-color: rgba(15, 23, 42, 0.45); backdrop-filter: blur(3px);"
+    >
+      <div class="modal-dialog modal-dialog-centered" style="max-width: 460px;">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+          <div class="modal-body p-4 text-center">
+            <div class="mb-3">
+              <div class="mx-auto rounded-circle bg-warning-subtle text-warning d-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                <i class="bi bi-exclamation-triangle-fill fs-2"></i>
+              </div>
+            </div>
+
+            <h5 class="fw-bold text-dark mb-2">Timpa Jadwal Resmi?</h5>
+            <p class="text-secondary small mb-4">
+              Saat ini sudah terdapat <strong>jadwal pelajaran aktif</strong> pada halaman <strong>Jadwal Resmi</strong>. 
+              Apakah Anda yakin ingin menggantinya dengan jadwal baru dari Wizard ini?
+              <br><span class="text-muted mt-1 d-inline-block">(Draft jadwal di Wizard Anda akan tetap tersimpan dan tidak hilang).</span>
+            </p>
+
+            <div class="d-flex align-items-center justify-content-center gap-2">
+              <button 
+                type="button" 
+                class="btn btn-light rounded-3 px-4 fw-semibold text-secondary shadow-none border"
+                @click="showOverwritePublishModal = false"
+                :disabled="wizardStore.isProcessing"
+              >
+                Batal
+              </button>
+              <button 
+                type="button" 
+                class="btn btn-primary rounded-3 px-4 fw-semibold shadow-none d-flex align-items-center gap-2"
+                @click="confirmOverwritePublish"
+                :disabled="wizardStore.isProcessing"
+              >
+                <span v-if="wizardStore.isProcessing" class="spinner-border spinner-border-sm" role="status"></span>
+                <span>Ya, Timpa Jadwal Resmi</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </SidebarAdmin>
 </template>
 
@@ -122,6 +170,10 @@ const showModal = ref(false);
 const activeSlot = ref<TimeSlot | null>(null);
 const activeSchedule = ref<ScheduleItem | null>(null);
 const activeClassId = ref<number | null>(null);
+
+const showOverwritePublishModal = ref(false);
+const existingPublishedCount = ref(0);
+const pendingPublishClassId = ref<number | null>(null);
 
 const isInitializing = ref(true);
 
@@ -219,15 +271,16 @@ watch(() => wizardStore.selectedTeacherId, (newId) => {
 
 onMounted(async () => {
   isInitializing.value = true;
-  
+  wizardStore.scheduleSource = 'draft'; // Pastikan Wizard selalu membaca tabel staging (schedules)
+
   await fetchDropdowns();
-  
+
   if (wizardStore.selectedClassId) {
     await fetchClassSubjects(wizardStore.selectedClassId);
   }
 
   await wizardStore.refreshCurrentView();
-  
+
   isInitializing.value = false;
 });
 
@@ -290,8 +343,27 @@ const handleReset = () => {
   wizardStore.resetSchedule(targetClassId);
 };
 
-const handlePublish = () => {
-  const targetClassId = wizardStore.viewMode === 'master' ? null : wizardStore.selectedClassId;
-  wizardStore.publishSchedule(targetClassId);
+const handlePublish = async () => {
+  const result = await wizardStore.publishSchedule(null, false);
+
+  if (result?.requiresConfirmation) {
+    pendingPublishClassId.value = null;
+    existingPublishedCount.value = result.existingCount || 0;
+    showOverwritePublishModal.value = true;
+  }
+};
+
+const confirmOverwritePublish = async () => {
+  try {
+    await wizardStore.publishSchedule(pendingPublishClassId.value, true);
+  } finally {
+    showOverwritePublishModal.value = false;
+  }
 };
 </script>
+
+<style scoped>
+.bg-warning-subtle {
+  background-color: #fef9c3 !important;
+}
+</style>

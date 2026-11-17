@@ -46,7 +46,7 @@
                 </span>
 
                 <!-- Sel Berisi Jadwal Terpublikasi -->
-                <template v-else-if="getSchedule(day, periodNumber) && getSchedule(day, periodNumber)?.status === 'published'">
+                <template v-else-if="isPublishedSchedule(getSchedule(day, periodNumber))">
                   <!-- Routine Activity (Warna Kuning Murni) -->
                   <div 
                     v-if="getSchedule(day, periodNumber)?.custom_activity" 
@@ -119,6 +119,10 @@ const props = defineProps<{
 
 const days = ['senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu'];
 
+const isPublishedSchedule = (sched: ScheduleItem | null): boolean => {
+  return Boolean(sched && (!sched.status || sched.status === 'published'));
+};
+
 const periodNumbers = computed(() => {
   const periods = new Set<number>();
   props.timeSlots.forEach(slot => periods.add(slot.period_number));
@@ -175,7 +179,7 @@ const legendItems = computed(() => {
   const map = new Map<string, { colorHex: string; subjectName: string; teacherName: string; jpCount: number }>();
 
   Object.values(props.schedules || {}).forEach((sched) => {
-    if (sched && sched.status === 'published' && sched.class_subject_teacher) {
+    if (isPublishedSchedule(sched) && sched.class_subject_teacher) {
       const cst = sched.class_subject_teacher;
       const subjName = cst.class_subject?.subject?.subject_name || '-';
       const tchrName = cst.teacher?.name || '-';

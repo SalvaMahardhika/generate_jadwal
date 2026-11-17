@@ -7,6 +7,7 @@ use App\Http\Requests\Schedule\GenerateScheduleRequest;
 use App\Http\Requests\Schedule\LockSlotRequest;
 use App\Http\Requests\Schedule\ManualAssignScheduleRequest;
 use App\Models\Classes;
+use App\Models\PublishedSchedule;
 use App\Models\Teacher;
 use App\Models\Schedule;
 use App\Models\TimeSlot;
@@ -28,6 +29,7 @@ class ScheduleWizardController extends Controller
     {
         $academicYearId = $request->query('academic_year_id', $class->academic_year_id);
         $profileId      = $request->query('time_slot_profile_id', $class->time_slot_profile_id);
+        $source         = $request->query('source', 'draft') === 'published' ? 'published' : 'draft';
 
         $timeSlots = TimeSlot::query()
             ->when($profileId, fn($q) => $q->where('time_slot_profile_id', $profileId))
@@ -35,7 +37,9 @@ class ScheduleWizardController extends Controller
             ->orderBy('period_number', 'asc')
             ->get();
 
-        $schedules = Schedule::with([
+        $modelClass = $source === 'published' ? PublishedSchedule::class : Schedule::class;
+
+        $schedules = $modelClass::with([
             'classSubjectTeacher.classSubject.subject',
             'classSubjectTeacher.teacher',
             'timeSlot',
@@ -43,9 +47,14 @@ class ScheduleWizardController extends Controller
         ->where('academic_year_id', $academicYearId)
         ->where('class_id', $class->id)
         ->get()
+        ->each(function ($item) use ($source) {
+            if ($source === 'published') {
+                $item->setAttribute('status', 'published');
+            }
+        })
         ->keyBy('time_slot_id');
 
-        $balance = $this->generatorService->getClassBalance($class->id, $academicYearId);
+        $balance = $this->generatorService->getClassBalance($class->id, (int) $academicYearId, $source);
 
         return response()->json([
             'status' => 'success',
@@ -76,6 +85,7 @@ class ScheduleWizardController extends Controller
         }
 
         $profileId = $request->query('time_slot_profile_id');
+        $source    = $request->query('source', 'draft') === 'published' ? 'published' : 'draft';
 
         $timeSlots = TimeSlot::query()
             ->when($profileId, fn($q) => $q->where('time_slot_profile_id', $profileId))
@@ -86,7 +96,8 @@ class ScheduleWizardController extends Controller
         $data = $this->generatorService->getTeacherMatrixData(
             $teacher->id,
             (int) $academicYearId,
-            $profileId ? (int) $profileId : null
+            $profileId ? (int) $profileId : null,
+            $source
         );
 
         return response()->json([
@@ -106,6 +117,7 @@ class ScheduleWizardController extends Controller
         }
 
         $profileId = $request->query('time_slot_profile_id');
+        $source    = $request->query('source', 'draft') === 'published' ? 'published' : 'draft';
 
         $timeSlots = TimeSlot::query()
             ->when($profileId, fn($q) => $q->where('time_slot_profile_id', $profileId))
@@ -115,7 +127,8 @@ class ScheduleWizardController extends Controller
 
         $data = $this->generatorService->getMasterMatrixData(
             (int) $academicYearId,
-            $profileId ? (int) $profileId : null
+            $profileId ? (int) $profileId : null,
+            $source
         );
 
         return response()->json([
@@ -130,7 +143,9 @@ class ScheduleWizardController extends Controller
     public function getBalance(Request $request, Classes $class): JsonResponse
     {
         $academicYearId = $request->query('academic_year_id', $class->academic_year_id);
-        $balance = $this->generatorService->getClassBalance($class->id, $academicYearId);
+        $source         = $request->query('source', 'draft') === 'published' ? 'published' : 'draft';
+
+        $balance = $this->generatorService->getClassBalance($class->id, (int) $academicYearId, $source);
 
         return response()->json([
             'status' => 'success',
@@ -139,7 +154,7 @@ class ScheduleWizardController extends Controller
     }
 
     /**
-     * Auto-generate jadwal otomatis.
+     * Auto-generate jadwal otomatis (Staging / Wizard).
      */
     public function generate(GenerateScheduleRequest $request): JsonResponse
     {
@@ -169,7 +184,7 @@ class ScheduleWizardController extends Controller
     }
 
     /**
-     * Mengunci atau membuka kuncian slot jadwal harian.
+     * Mengunci atau membuka kuncian slot jadwal harian (Staging / Wizard).
      */
     public function lockSlot(LockSlotRequest $request): JsonResponse
     {
@@ -194,15 +209,14 @@ class ScheduleWizardController extends Controller
     }
 
     /**
-     * Menempatkan/mengubah mapel secara manual dengan penanganan error bentrok.
+     * Menempatkan/mengubah mapel secara manual dengan penanganan error bentrok (Staging / Wizard).
      */
     public function manualAssign(ManualAssignScheduleRequest $request): JsonResponse
     {
         try {
-            $userId   = $request->user()?->id ?? 1;
-            $payload  = $request->validated();
-            
-            // Kompatibilitas mundur: dukung opsi apply_to_all_profiles maupun apply_to_all_classes
+            $userId  = $request->user()?->id ?? 1;
+            $payload = $request->validated();
+
             if (isset($payload['apply_to_all_profiles']) && !isset($payload['apply_to_all_classes'])) {
                 $payload['apply_to_all_classes'] = $payload['apply_to_all_profiles'];
             }
@@ -226,16 +240,16 @@ class ScheduleWizardController extends Controller
     }
 
     /**
-     * Mengosongkan 1 slot sel secara manual.
+     * Mengosongkan 1 slot sel secara manual (Staging / Wizard).
      */
     public function clearSlot(Request $request): JsonResponse
     {
         $request->validate([
-            'academic_year_id'      => ['required', 'exists:academic_years,id'],
-            'class_id'              => ['required', 'exists:classes,id'],
-            'time_slot_id'          => ['required', 'exists:time_slots,id'],
-            'clear_all_classes'     => ['nullable', 'boolean'],
-            'clear_all_profiles'    => ['nullable', 'boolean'],
+            'academic_year_id'   => ['required', 'exists:academic_years,id'],
+            'class_id'           => ['required', 'exists:classes,id'],
+            'time_slot_id'       => ['required', 'exists:time_slots,id'],
+            'clear_all_classes'  => ['nullable', 'boolean'],
+            'clear_all_profiles' => ['nullable', 'boolean'],
         ]);
 
         $clearAll = (bool) ($request->input('clear_all_profiles') ?? $request->input('clear_all_classes', false));
@@ -254,7 +268,7 @@ class ScheduleWizardController extends Controller
     }
 
     /**
-     * Reset / Hapus seluruh slot yang tidak terkunci.
+     * Reset / Hapus seluruh slot yang tidak terkunci (Staging / Wizard).
      */
     public function reset(Request $request): JsonResponse
     {
@@ -275,44 +289,67 @@ class ScheduleWizardController extends Controller
     }
 
     /**
-     * Mengunci dan mempublikasikan jadwal secara resmi.
+     * Menyalin jadwal dari Wizard (schedules) ke Jadwal Resmi (published_schedules).
+     * Meminta konfirmasi jika jadwal resmi sudah ada dan force = false.
      */
     public function publish(Request $request): JsonResponse
     {
         $request->validate([
             'academic_year_id' => ['required', 'exists:academic_years,id'],
             'class_id'         => ['nullable', 'exists:classes,id'],
+            'force'            => ['nullable', 'boolean'],
         ]);
 
-        $affected = $this->generatorService->publish(
-            (int) $request->input('academic_year_id'),
-            $request->input('class_id') ? (int) $request->input('class_id') : null
-        );
+        try {
+            $userId = $request->user()?->id ?? 1;
+            $result = $this->generatorService->publish(
+                (int) $request->input('academic_year_id'),
+                $request->input('class_id') ? (int) $request->input('class_id') : null,
+                (bool) $request->input('force', false),
+                $userId
+            );
 
-        return response()->json([
-            'status'  => 'success',
-            'message' => "Berhasil mempublikasikan {$affected} entri jadwal.",
-        ]);
+            if (!empty($result['requires_confirmation'])) {
+                return response()->json([
+                    'status'  => 'success',
+                    'message' => 'Jadwal resmi sudah ada. Konfirmasi diperlukan sebelum menimpa jadwal resmi.',
+                    'data'    => $result,
+                ]);
+            }
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => "Berhasil mempublikasikan {$result['published_count']} entri jadwal ke Jadwal Resmi.",
+                'data'    => $result,
+            ]);
+        } catch (Exception $e) {
+            $code = (int) $e->getCode();
+            $statusCode = ($code >= 400 && $code <= 599) ? $code : 422;
+
+            return response()->json([
+                'status'  => 'error',
+                'message' => $e->getMessage(),
+            ], $statusCode);
+        }
     }
 
     /**
-     * Mengembalikan status jadwal PUBLISHED menjadi DRAFT.
+     * Menghapus seluruh jadwal resmi pada tahun ajaran terkait (published_schedules).
+     * Draft di Wizard tetap utuh.
      */
-    public function unpublish(Request $request): JsonResponse
+    public function deletePublished(Request $request): JsonResponse
     {
         $request->validate([
             'academic_year_id' => ['required', 'exists:academic_years,id'],
-            'class_id'         => ['nullable', 'exists:classes,id'],
         ]);
 
-        $affected = $this->generatorService->unpublish(
-            (int) $request->input('academic_year_id'),
-            $request->input('class_id') ? (int) $request->input('class_id') : null
+        $affected = $this->generatorService->deletePublished(
+            (int) $request->input('academic_year_id')
         );
 
         return response()->json([
             'status'  => 'success',
-            'message' => "Berhasil mengembalikan {$affected} entri jadwal menjadi draft.",
+            'message' => "Berhasil menghapus seluruh ({$affected} entri) jadwal resmi.",
         ]);
     }
 }
