@@ -16,8 +16,8 @@
               <i class="bi bi-calendar-check-fill fs-6"></i>
             </div>
             <div class="sidebar-text text-nowrap" v-show="!isCollapsed">
-              <h6 class="fw-bold text-dark mb-0 fs-6">Sistem Jadwal</h6>
-              <small class="text-muted" style="font-size: 0.72rem;">Automated Timetabling</small>
+              <h6 class="fw-bold text-dark mb-0 fs-6">Generate Jadwal</h6>
+              <small class="text-muted" style="font-size: 0.72rem;">Generator Jadwal Otomatis</small>
             </div>
           </div>
         </div>
@@ -119,13 +119,9 @@
           >
             <i class="bi bi-list fs-5"></i>
           </button>
-          <h5 class="fw-bold text-dark mb-0 fs-6">Panel Administrator</h5>
+          <h5 class="fw-bold text-dark mb-0 fs-6"></h5>
         </div>
-        <div class="d-flex align-items-center gap-3">
-          <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-2 fw-medium fs-8">
-            <i class="bi bi-circle-fill me-1 fs-9"></i> Sistem Siap
-          </span>
-        </div>
+        
       </header>
 
       <!-- Page Slot Content -->
